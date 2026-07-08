@@ -1,0 +1,87 @@
+@import "tailwindcss";
+@variant dark (&:where(.dark, .dark *));
+
+@theme {
+  /* Curefoods Navy Blue Palette overriding default slate */
+  --color-slate-50: #f0f4fa;
+  --color-slate-100: #dbe4f2;
+  --color-slate-200: #b6cae6;
+  --color-slate-300: #8baad5;
+  --color-slate-400: #6085c0;
+  --color-slate-500: #3f65a1;
+  --color-slate-600: #2c4a7c;
+  --color-slate-700: #213861;
+  --color-slate-800: #152542;
+  --color-slate-900: #0a1326;
+  --color-slate-950: #040812;
+
+  /* Curefoods Cyan Palette overriding default emerald */
+  --color-emerald-50: var(--color-cyan-50);
+  --color-emerald-100: var(--color-cyan-100);
+  --color-emerald-200: var(--color-cyan-200);
+  --color-emerald-300: var(--color-cyan-300);
+  --color-emerald-400: var(--color-cyan-400);
+  --color-emerald-500: var(--color-cyan-500);
+  --color-emerald-600: var(--color-cyan-600);
+  --color-emerald-700: var(--color-cyan-700);
+  --color-emerald-800: var(--color-cyan-800);
+  --color-emerald-900: var(--color-cyan-900);
+  --color-emerald-950: var(--color-cyan-950);
+}
+
+@layer base {
+  :root {
+    color-scheme: light dark;
+  }
+  
+  * {
+    box-sizing: border-box;
+  }
+  
+  body {
+    @apply bg-slate-50 dark:bg-slate-950 text-slate-900 dark:text-white;
+    font-family: 'Inter', 'Segoe UI', system-ui, -apple-system, sans-serif;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  ::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+  }
+  ::-webkit-scrollbar-track {
+    @apply bg-slate-100 dark:bg-slate-900;
+  }
+  ::-webkit-scrollbar-thumb {
+    @apply bg-slate-300 dark:bg-slate-700 rounded-full;
+  }
+  ::-webkit-scrollbar-thumb:hover {
+    @apply bg-slate-400 dark:bg-slate-600;
+  }
+}
+
+@layer utilities {
+  .glass {
+    @apply bg-white dark:bg-slate-900/80 backdrop-blur-sm border border-slate-100 dark:border-slate-800 shadow-sm transition-all duration-300 hover:shadow-md rounded-2xl;
+  }
+  .card {
+    @apply rounded-2xl bg-white dark:bg-slate-900/80 border border-slate-100 dark:border-slate-800 shadow-[0_2px_12px_-4px_rgba(0,0,0,0.04)] dark:shadow-none transition-all duration-300 hover:shadow-[0_8px_24px_-8px_rgba(0,0,0,0.08)] dark:hover:border-slate-700 hover:-translate-y-0.5;
+  }
+  .gradient-text {
+    @apply bg-gradient-to-r from-emerald-400 to-teal-400 bg-clip-text text-transparent;
+  }
+}
+
+@layer base {
+  /* Hide the native date picker calendar icon */
+  input[type="date"]::-webkit-calendar-picker-indicator {
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    width: 100%;
+    height: 100%;
+    opacity: 0;
+    cursor: pointer;
+  }
+}

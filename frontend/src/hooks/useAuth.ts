@@ -1,0 +1,60 @@
+// src/hooks/useAuth.ts
+'use client'
+import { useState, useEffect, useCallback } from 'react'
+import { supabase } from '@/lib/supabase'
+
+export interface AuthUser {
+  id: string
+  email: string
+  role: string
+}
+
+export function useAuth() {
+  const [user, setUser]       = useState<AuthUser | null>(null)
+  const [loading, setLoading] = useState(true)
+
+  const DEMO_MODE = process.env.NEXT_PUBLIC_DEMO_MODE === 'true'
+
+  useEffect(() => {
+    if (DEMO_MODE) {
+      setUser({ id: 'demo', email: 'demo@curefoods.com', role: 'super_admin' })
+      setLoading(false)
+      return
+    }
+
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      if (session?.user) {
+        const role = session.user.user_metadata?.role || 'demand_planner'
+        const token = session.access_token
+        localStorage.setItem('sb-token', token)
+        setUser({ id: session.user.id, email: session.user.email!, role })
+      }
+      setLoading(false)
+    })
+
+    const { data: listener } = supabase.auth.onAuthStateChange((_event, session) => {
+      if (session?.user) {
+        const role = session.user.user_metadata?.role || 'demand_planner'
+        localStorage.setItem('sb-token', session.access_token)
+        setUser({ id: session.user.id, email: session.user.email!, role })
+      } else {
+        setUser(null)
+        localStorage.removeItem('sb-token')
+      }
+    })
+
+    return () => listener.subscription.unsubscribe()
+  }, [DEMO_MODE])
+
+  const signInWithGoogle = useCallback(async () => {
+    await supabase.auth.signInWithOAuth({ provider: 'google' })
+  }, [])
+
+  const signOut = useCallback(async () => {
+    await supabase.auth.signOut()
+    setUser(null)
+    localStorage.removeItem('sb-token')
+  }, [])
+
+  return { user, loading, signInWithGoogle, signOut }
+}
