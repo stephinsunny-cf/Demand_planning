@@ -1,0 +1,32 @@
+# Environments
+venv/
+env/
+.env
+.env.local
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# Node
+node_modules/
+
+# Data Files
+*.csv
+*.xlsx
+*.xls
+*.json
+*.har
+*.png
+*.jpg
+*.jpeg
+!package.json
+!tsconfig.json
+
+# Logs & OS
+logs/
+*.log
+.DS_Store
+Thumbs.db
