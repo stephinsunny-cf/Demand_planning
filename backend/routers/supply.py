@@ -23,19 +23,20 @@ async def get_supply_plan(
 
     # 3-day ingredient demand per kitchen
     fore_df = query_df(f"""
-        SELECT ingredient AS sku, outlet AS kitchen,
-               sum(total_qty_needed) AS forecast_3day
-        FROM fact_ingredient_demand
-        WHERE forecast_date >= '{today}' AND forecast_date <= '{in_3d}'
-        GROUP BY ingredient, outlet
+        SELECT f.sku, f.outlet AS kitchen,
+               sum(f.qty_predicted) AS forecast_3day
+        FROM fact_forecast f
+        JOIN procurement_tracker pt ON f.sku = pt.ingredient
+        WHERE f.forecast_date >= '{today}' AND f.forecast_date <= '{in_3d}'
+        GROUP BY f.sku, f.outlet
     """)
 
     # Latest kitchen stock
     stock_df = query_df("""
         SELECT kitchen, ingredient AS sku, sum(qty_available) AS stock_qty
         FROM fact_kitchen_stock
-        WHERE (kitchen, ingredient, snapshot_time) IN (
-          SELECT kitchen, ingredient, max(snapshot_time)
+        WHERE (kitchen, ingredient, snapshot_date) IN (
+          SELECT kitchen, ingredient, max(snapshot_date)
           FROM fact_kitchen_stock GROUP BY kitchen, ingredient
         ) GROUP BY kitchen, ingredient
     """)

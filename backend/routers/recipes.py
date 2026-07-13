@@ -26,10 +26,18 @@ async def get_recipes(
     if dish_name: where.append(f"lower(dish_name) LIKE lower('%{dish_name}%')")
 
     df = query_df(f"""
-        SELECT dish_name, ingredient, qty_per_portion, unit, yield_factor
-        FROM dim_recipe_master
+        SELECT 
+            r.dish_name, 
+            r.ingredient, 
+            r.qty_per_portion, 
+            r.unit, 
+            r.yield_factor,
+            pt.code as sku_code,
+            CASE WHEN pt.ingredient IS NOT NULL THEN true ELSE false END as is_tracked
+        FROM dim_recipe_master r
+        LEFT JOIN procurement_tracker pt ON r.ingredient = pt.ingredient
         WHERE {' AND '.join(where)}
-        ORDER BY dish_name, ingredient
+        ORDER BY r.dish_name, r.ingredient
         LIMIT 2000
     """)
     return df.to_dict(orient="records") if not df.empty else []

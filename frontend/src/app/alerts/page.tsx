@@ -30,8 +30,7 @@ export default function AlertsPage() {
   const fetchAlerts = async () => {
     setLoading(true)
     const params = new URLSearchParams({
-      resolved: String(showResolved),
-      ...(severity && { severity }),
+      resolved: String(showResolved)
     })
     const r = await api.get(`/api/alerts?${params}`).catch(() => ({ data: [] }))
     setAlerts(r.data)
@@ -42,7 +41,7 @@ export default function AlertsPage() {
     fetchAlerts()
     const interval = setInterval(fetchAlerts, 5 * 60 * 1000)
     return () => clearInterval(interval)
-  }, [severity, showResolved])
+  }, [showResolved])
 
   const resolve = async (alertId: string) => {
     await api.post(`/api/alerts/${alertId}/resolve`)
@@ -57,6 +56,8 @@ export default function AlertsPage() {
 
   const counts = { CRITICAL: 0, WARNING: 0, INFO: 0 }
   for (const a of alerts) { if (a.severity in counts) counts[a.severity as keyof typeof counts]++ }
+
+  const filteredAlerts = alerts.filter(a => !severity || a.severity === severity)
 
   return (
     <Layout title="Alerts">
@@ -105,7 +106,7 @@ export default function AlertsPage() {
 
       {loading ? <LoadingSpinner /> : (
         <div className="space-y-3">
-          {alerts.length === 0 && (
+          {filteredAlerts.length === 0 && (
             <div className="card p-16 rounded-2xl text-center">
               <CheckCircle className="w-12 h-12 text-emerald-400 mx-auto mb-3" />
               <p className="text-slate-900 dark:text-white font-medium mb-1">No alerts</p>
@@ -113,7 +114,7 @@ export default function AlertsPage() {
             </div>
           )}
 
-          {alerts.map(alert => (
+          {filteredAlerts.map(alert => (
             <div
               key={alert.alert_id}
               className={clsx(

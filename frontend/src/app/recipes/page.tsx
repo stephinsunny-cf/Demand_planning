@@ -23,6 +23,7 @@ export default function RecipesPage() {
   const [loading,   setLoading]  = useState(true)
   const [search,    setSearch]   = useState('')
   const [brand,     setBrand]    = useState('')
+  const [trackedOnly, setTrackedOnly] = useState(false)
   const [editDish,  setEditDish] = useState<string | null>(null)
   const [editRows,  setEditRows] = useState<Recipe[]>([])
   const [brands,    setBrands]   = useState<string[]>([])
@@ -57,11 +58,17 @@ export default function RecipesPage() {
   }
 
   const noRecipeDishes = [...new Set(rows.filter(r => !r.ingredient).map(r => r.dish_name))]
+  const displayRows = trackedOnly ? rows.filter(r => (r as any).is_tracked) : rows
 
   const columns = [
     { key: 'dish_name',       label: 'Dish',         sortable: true },
     { key: 'brand',           label: 'Brand',        sortable: true },
-    { key: 'ingredient',      label: 'Ingredient',   sortable: true },
+    { key: 'ingredient',      label: 'Ingredient',   sortable: true, render: (v: unknown, row: any) => (
+      <div className="flex items-center gap-2">
+        <span>{String(v)} {row.sku_code ? <span className="text-slate-400 text-xs">({row.sku_code})</span> : null}</span>
+        {row.is_tracked && <span className="bg-emerald-100 text-emerald-700 dark:bg-emerald-500/20 dark:text-emerald-400 px-1.5 py-0.5 rounded text-[10px] font-medium border border-emerald-200 dark:border-emerald-500/30">Tracked</span>}
+      </div>
+    )},
     { key: 'qty_per_portion', label: 'Qty/Portion',  sortable: true, render: (v: unknown) => Number(v).toFixed(2) },
     { key: 'unit',            label: 'Unit',         sortable: false },
     { key: 'yield_factor',    label: 'Yield Factor', sortable: true, render: (v: unknown) => {
@@ -106,15 +113,20 @@ export default function RecipesPage() {
           <option value="">All Brands</option>
           {brands.map(b => <option key={b} value={b}>{b}</option>)}
         </select>
+        <label className="flex items-center gap-2 text-sm text-slate-600 dark:text-slate-300 ml-4 cursor-pointer">
+          <input type="checkbox" checked={trackedOnly} onChange={e => setTrackedOnly(e.target.checked)}
+            className="rounded border-slate-300 text-emerald-500 focus:ring-emerald-500 bg-slate-100 dark:bg-slate-800" />
+          Tracked Ingredients Only
+        </label>
       </div>
 
       <div className="card p-6 rounded-2xl">
         <div className="flex items-center gap-3 mb-4">
           <ChefHat size={18} className="text-emerald-400" />
-          <h3 className="text-sm font-semibold text-slate-900 dark:text-white">Recipe Master ({rows.length} rows)</h3>
+          <h3 className="text-sm font-semibold text-slate-900 dark:text-white">Recipe Master ({displayRows.length} rows)</h3>
         </div>
         {loading ? <LoadingSpinner /> : (
-          <DataTable columns={columns} data={rows as unknown as Record<string, unknown>[]} searchKeys={['dish_name', 'ingredient', 'brand']} />
+          <DataTable columns={columns} data={displayRows as unknown as Record<string, unknown>[]} searchKeys={['dish_name', 'ingredient', 'brand']} />
         )}
       </div>
 

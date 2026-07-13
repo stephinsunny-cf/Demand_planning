@@ -18,14 +18,14 @@ interface Props {
   searchable?: boolean
   searchKeys?: string[]
   maxRows?:  number
+  pageSize?: number
 }
 
-export default function DataTable({ columns, data, searchable = true, searchKeys, maxRows = 200 }: Props) {
+export default function DataTable({ columns, data, searchable = true, searchKeys, maxRows = 50000, pageSize = 2000 }: Props) {
   const [sortKey,   setSortKey]   = useState<string | null>(null)
   const [sortDir,   setSortDir]   = useState<'asc' | 'desc'>('asc')
   const [search,    setSearch]    = useState('')
   const [page,      setPage]      = useState(0)
-  const PAGE_SIZE = 50
 
   const handleSort = (key: string) => {
     if (sortKey === key) {
@@ -55,8 +55,8 @@ export default function DataTable({ columns, data, searchable = true, searchKeys
     return d
   }, [data, search, searchKeys, sortKey, sortDir, maxRows])
 
-  const pages = Math.ceil(filtered.length / PAGE_SIZE)
-  const displayed = filtered.slice(page * PAGE_SIZE, (page + 1) * PAGE_SIZE)
+  const pages = Math.ceil(filtered.length / pageSize)
+  const displayed = filtered.slice(page * pageSize, (page + 1) * pageSize)
 
   return (
     <div className="space-y-3">

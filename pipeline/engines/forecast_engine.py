@@ -86,7 +86,6 @@ def _prophet_forecast(history: pd.DataFrame, sku: str, outlet: str) -> pd.DataFr
     try:
         from prophet import Prophet
     except ImportError:
-        log.warning("Prophet not installed — using moving average fallback")
         return _moving_average_forecast(history, sku, outlet)
 
     try:
@@ -182,11 +181,28 @@ def run() -> pd.DataFrame:
     print("ENGINE 2: Forecast Engine (Prophet) - start")
 
     try:
-        # Load historical sales (limit to last 40 days to avoid memory issues with 40M rows)
-        sales_df = query_df("SELECT date, sku, outlet, qty_sold FROM fact_daily_sales WHERE date >= CURRENT_DATE - INTERVAL '40 days'")
+        # Find the maximum date in the dataset to simulate "today"
+        max_date_df = query_df("""
+            SELECT MAX(f.date) as max_date 
+            FROM fact_daily_sales f
+            JOIN procurement_tracker pt ON f.sku = pt.ingredient
+        """)
+        if max_date_df.empty or pd.isnull(max_date_df.iloc[0]["max_date"]):
+            print("No sales data found in database.")
+            return pd.DataFrame()
+            
+        max_date = max_date_df.iloc[0]["max_date"]
+
+        # Load historical sales (limit to last 40 days of available data)
+        sales_df = query_df(f"""
+            SELECT f.date, f.sku, f.outlet, f.qty_sold 
+            FROM fact_daily_sales f
+            JOIN procurement_tracker pt ON f.sku = pt.ingredient
+            WHERE f.date >= DATE '{max_date}' - INTERVAL '40 days'
+        """)
 
         if sales_df.empty:
-            print("No sales data found — run sales aggregation engine first")
+            print("No sales data found for tracked items — run sales aggregation engine first")
             return pd.DataFrame()
 
         sales_df["date"] = pd.to_datetime(sales_df["date"]).dt.date
@@ -203,9 +219,6 @@ def run() -> pd.DataFrame:
 
         all_forecasts = []
         skipped = 0
-
-        # Run for a small subset to test fast
-        combos = combos.head(200)
 
         for _, row in combos.iterrows():
             sku    = row["sku"]

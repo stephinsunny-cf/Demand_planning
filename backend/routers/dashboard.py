@@ -15,12 +15,12 @@ IST = timezone(timedelta(hours=5, minutes=30))
 async def get_dashboard_summary(user: UserContext = Depends(get_current_user)):
     today = date.today()
 
-    # Today's orders
-    orders_df = query_df(f"SELECT count() AS cnt FROM fact_orders_raw WHERE toDate(created_at) = '{today}'")
-    total_orders_today = int(orders_df["cnt"].iloc[0]) if not orders_df.empty else 0
+    # Today's orders (uses the most recent date in the DB to simulate 'today's' batch data)
+    orders_df = query_df("SELECT sum(order_count) AS cnt FROM fact_daily_sales WHERE date = (SELECT MAX(date) FROM fact_daily_sales)")
+    total_orders_today = int(orders_df["cnt"].iloc[0]) if not orders_df.empty and pd.notna(orders_df["cnt"].iloc[0]) else 0
 
     # Alerts counts
-    alerts_df = query_df("SELECT severity, count() AS cnt FROM alerts WHERE resolved = 0 GROUP BY severity")
+    alerts_df = query_df("SELECT severity, COUNT(*) AS cnt FROM alerts WHERE resolved = 0 GROUP BY severity")
     active_alerts    = int(alerts_df["cnt"].sum()) if not alerts_df.empty else 0
     critical_alerts  = int(alerts_df[alerts_df["severity"] == "CRITICAL"]["cnt"].sum()) if not alerts_df.empty else 0
 

@@ -54,7 +54,7 @@ export default function DashboardPage() {
   return (
     <Layout title="Dashboard">
       {loading ? (
-        <LoadingSpinner size="lg" />
+        <LoadingSpinner />
       ) : (
         <div className="space-y-6">
 
