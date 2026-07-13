@@ -2,21 +2,17 @@
 'use client'
 import { useState, useEffect } from 'react'
 import Link from 'next/link'
-import { useTheme } from 'next-themes'
-import { Sun, Moon, Monitor, Bell, LogOut, User, AlertCircle, Clock } from 'lucide-react'
+import { Bell, LogOut, User, AlertCircle, Clock } from 'lucide-react'
 import { useAuth } from '@/hooks/useAuth'
 import api from '@/lib/api'
 
 export default function Header({ title }: { title: string }) {
   const { user, signOut }  = useAuth()
-  const { theme, setTheme } = useTheme()
-  const [mounted, setMounted] = useState(false)
   const [alerts, setAlerts] = useState<number>(0)
   const [refresh, setRefresh] = useState<string>('')
   const [stale, setStale]     = useState(false)
 
   useEffect(() => {
-    setMounted(true)
     // Fetch active alert count
     api.get('/api/alerts?resolved=false')
       .then(r => setAlerts(r.data.length))
@@ -57,21 +53,6 @@ export default function Header({ title }: { title: string }) {
       )}
 
       <div className="flex items-center gap-3">
-        {/* Theme Toggle */}
-        {mounted && (
-          <div className="flex items-center gap-1 p-1 rounded-xl bg-slate-200 dark:bg-slate-900 border border-slate-300 dark:border-slate-800">
-            <button onClick={() => setTheme('light')} className={`p-1.5 rounded-lg transition-colors ${theme === 'light' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`} title="Light Mode">
-              <Sun size={14} />
-            </button>
-            <button onClick={() => setTheme('system')} className={`p-1.5 rounded-lg transition-colors ${theme === 'system' ? 'bg-white dark:bg-slate-800 text-slate-900 dark:text-white shadow-sm' : 'text-slate-500 hover:text-slate-700 dark:hover:text-slate-300'}`} title="System Preference">
-              <Monitor size={14} />
-            </button>
-            <button onClick={() => setTheme('dark')} className={`p-1.5 rounded-lg transition-colors ${theme === 'dark' ? 'bg-slate-800 text-white shadow-sm' : 'text-slate-500 hover:text-slate-300'}`} title="Dark Mode">
-              <Moon size={14} />
-            </button>
-          </div>
-        )}
-
         {/* Alerts bell */}
         <Link href="/alerts" className="relative p-2 rounded-lg hover:bg-slate-200 dark:hover:bg-slate-800 transition-colors">
           <Bell size={18} className="text-slate-500 dark:text-slate-400" />
