@@ -44,7 +44,7 @@ logging.basicConfig(
 )
 log = logging.getLogger("backend.main")
 
-DEMO_MODE = os.getenv("DEMO_MODE", "true").lower() == "true"
+DEMO_MODE = os.getenv("DEMO_MODE", "false").lower() == "true"
 
 app = FastAPI(
     title="Curefoods Demand Planning Engine",
