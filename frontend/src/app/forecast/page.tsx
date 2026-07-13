@@ -174,7 +174,7 @@ export default function ForecastPage() {
                 { key: 'display_sku', label: 'Product SKU', sortable: true },
                 { key: 'outlet', label: 'Outlet', sortable: true },
                 { key: 'total_predicted', label: `${forecastDays}-Day Forecast Qty`, sortable: true, render: v => Number(v).toFixed(1) },
-                { key: 'percentage', label: '% of Total Demand', sortable: true, render: v => <span className="text-emerald-500 font-medium">{v}%</span> },
+                { key: 'percentage', label: '% of Total Demand', sortable: true, render: v => <span className="text-emerald-500 font-medium">{String(v)}%</span> },
               ]}
               data={filteredForecasts}
               searchable={false}
