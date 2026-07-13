@@ -50,11 +50,16 @@ export function useAuth() {
     await supabase.auth.signInWithOAuth({ provider: 'google' })
   }, [])
 
+  const signInWithEmail = useCallback(async (email: string, password: string) => {
+    const { error } = await supabase.auth.signInWithPassword({ email, password })
+    if (error) throw error
+  }, [])
+
   const signOut = useCallback(async () => {
     await supabase.auth.signOut()
     setUser(null)
     localStorage.removeItem('sb-token')
   }, [])
 
-  return { user, loading, signInWithGoogle, signOut }
+  return { user, loading, signInWithGoogle, signInWithEmail, signOut }
 }
