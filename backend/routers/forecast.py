@@ -68,58 +68,95 @@ async def get_forecast(
     }
 
 
+from functools import lru_cache
+
+@lru_cache(maxsize=1)
+def get_cached_outlet_city_mapping():
+    df = query_df("SELECT city, array_agg(DISTINCT outlet) as outlets FROM fact_daily_sales GROUP BY city")
+    filters = []
+    mapping = {}
+    for _, row in df.iterrows():
+        city = row["city"]
+        outlets = list(row["outlets"])
+        filters.append({"city": city, "outlets": outlets})
+        for o in outlets:
+            mapping[o] = city
+    return filters, mapping
+
 @router.get("/forecast/filters")
 async def get_forecast_filters(
     user: UserContext = Depends(require_role("super_admin", "planning_manager", "demand_planner"))
 ):
-    df = query_df("SELECT city, array_agg(DISTINCT outlet) as outlets FROM fact_daily_sales GROUP BY city")
-    filters = []
-    for _, row in df.iterrows():
-        filters.append({
-            "city": row["city"],
-            "outlets": list(row["outlets"])
-        })
+    filters, _ = get_cached_outlet_city_mapping()
     return filters
 
 @router.get("/forecast/all")
 async def get_forecast_all(
     locations: Optional[str] = None,
     outlets: Optional[str] = None,
+    days: int = Query(default=7, description="Forecast horizon: 7, 14, or 30"),
     user: UserContext = Depends(require_role("super_admin", "planning_manager", "demand_planner")),
 ):
     today = date.today()
-    max_date_df = query_df("SELECT max(forecast_date) as max_date FROM fact_forecast")
-    if not max_date_df.empty and max_date_df["max_date"].iloc[0] is not None:
-        latest = __import__("pandas").to_datetime(max_date_df["max_date"].iloc[0]).date()
+    min_date_df = query_df("SELECT min(forecast_date) as min_date FROM fact_forecast WHERE forecast_date >= CURRENT_DATE")
+    if not min_date_df.empty and min_date_df["min_date"].iloc[0] is not None:
+        start_date = __import__("pandas").to_datetime(min_date_df["min_date"].iloc[0]).date()
     else:
-        latest = today
+        start_date = today
         
-    where_clauses = [f"f.forecast_date BETWEEN '{latest - timedelta(days=7)}' AND '{latest}'"]
+    where_clauses = [f"f.forecast_date BETWEEN '{start_date}' AND '{start_date + timedelta(days=days-1)}'"]
+    
+    filters_cache, mapping = get_cached_outlet_city_mapping()
     
     if locations:
-        loc_list = [l.strip().replace("'", "''") for l in locations.split(',')]
-        loc_in = ", ".join([f"'{l}'" for l in loc_list])
-        where_clauses.append(f"d.city IN ({loc_in})")
+        loc_list = [l.strip() for l in locations.split(',')]
+        valid_outlets = []
+        for f in filters_cache:
+            if f["city"] in loc_list:
+                valid_outlets.extend(f["outlets"])
+                
+        if outlets:
+            existing = [o.strip() for o in outlets.split(',')]
+            valid_outlets = list(set(valid_outlets) & set(existing))
+            
+        if not valid_outlets:
+            return []
+            
+        out_in = ", ".join([f"'{o.replace(chr(39), chr(39)+chr(39))}'" for o in valid_outlets])
+        where_clauses.append(f"f.outlet IN ({out_in})")
         
-    if outlets:
+    elif outlets:
         out_list = [o.strip().replace("'", "''") for o in outlets.split(',')]
         out_in = ", ".join([f"'{o}'" for o in out_list])
         where_clauses.append(f"f.outlet IN ({out_in})")
         
     where_sql = " AND ".join(where_clauses)
-        
+    
     df = query_df(f"""
-        SELECT f.sku, f.outlet, sum(f.qty_predicted) AS total_predicted_7d,
-               min(f.qty_lower) AS min_lower, max(f.qty_upper) AS max_upper,
-               max(f.model_run_date) AS model_run_date,
-               max(d.city) AS mapped_city,
-               max(r.sku_code) AS sku_code
-        FROM fact_forecast f
-        LEFT JOIN (SELECT DISTINCT dish_name, sku_code FROM dim_recipe_master) r ON LOWER(f.sku) = LOWER(r.dish_name)
-        LEFT JOIN (SELECT DISTINCT outlet, city FROM fact_daily_sales) d ON f.outlet = d.outlet
-        WHERE {where_sql}
-        GROUP BY f.sku, f.outlet
-        ORDER BY total_predicted_7d DESC
+        WITH forecast_agg AS (
+            SELECT 
+                f.sku as ingredient,
+                f.outlet,
+                SUM(f.qty_predicted) as agg_qty
+            FROM fact_forecast f
+            WHERE {where_sql}
+            GROUP BY f.sku, f.outlet
+        )
+        SELECT 
+            pt.ingredient AS sku,
+            COALESCE(fa.outlet, 'Network-Wide') AS outlet,
+            COALESCE(fa.agg_qty, 0) AS total_predicted,
+            pt.code AS sku_code
+        FROM procurement_tracker pt
+        LEFT JOIN forecast_agg fa ON pt.ingredient = fa.ingredient
+        ORDER BY total_predicted DESC
         LIMIT 5000
     """)
-    return df.to_dict(orient="records") if not df.empty else []
+    
+    rows = df.to_dict(orient="records") if not df.empty else []
+    for row in rows:
+        outlet_val = row.get("outlet")
+        row["mapped_city"] = mapping.get(outlet_val) if outlet_val and outlet_val != 'Network-Wide' else None
+        
+    return rows
+

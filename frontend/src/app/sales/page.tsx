@@ -101,41 +101,6 @@ export default function SalesPage() {
             <KPICard title="Unique SKUs"    value={summary.unique_skus as number || 0} icon={<Layers size={18} />} color="amber" />
           </div>
 
-          {/* Charts */}
-          <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
-            {/* Sales trend */}
-            <div className="card p-6 rounded-2xl">
-              <h3 className="text-sm font-semibold text-slate-900 dark:text-white mb-4">Daily Sales Trend</h3>
-              <ResponsiveContainer width="100%" height={240}>
-                <LineChart data={trend}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="#1e293b" />
-                  <XAxis dataKey="date" tick={{ fill: '#64748b', fontSize: 11 }} tickFormatter={v => v.slice(5)} />
-                  <YAxis tick={{ fill: '#64748b', fontSize: 11 }} />
-                  <Tooltip
-                    contentStyle={{ background: '#0f172a', border: '1px solid #1e293b', borderRadius: '8px' }}
-                    labelStyle={{ color: '#94a3b8' }}
-                  />
-                  <Legend />
-                  <Line type="monotone" dataKey="qty" stroke="#34d399" strokeWidth={2} dot={false} name="Qty Sold" />
-                  <Line type="monotone" dataKey="revenue" stroke="#818cf8" strokeWidth={2} dot={false} name="Revenue ₹" />
-                </LineChart>
-              </ResponsiveContainer>
-            </div>
-
-            {/* Top SKUs */}
-            <div className="card p-6 rounded-2xl">
-              <h3 className="text-sm font-semibold text-slate-900 dark:text-white mb-4">Top 10 SKUs by Volume</h3>
-              <ResponsiveContainer width="100%" height={240}>
-                <BarChart data={(summary.top_skus as Record<string, unknown>[] || []).slice(0, 10)} layout="vertical">
-                  <CartesianGrid strokeDasharray="3 3" stroke="#1e293b" horizontal={false} />
-                  <XAxis type="number" tick={{ fill: '#64748b', fontSize: 11 }} />
-                  <YAxis dataKey="sku" type="category" tick={{ fill: '#94a3b8', fontSize: 11 }} width={120} />
-                  <Tooltip contentStyle={{ background: '#0f172a', border: '1px solid #1e293b', borderRadius: '8px' }} />
-                  <Bar dataKey="total_qty" fill="#34d399" radius={[0, 4, 4, 0]} name="Qty Sold" />
-                </BarChart>
-              </ResponsiveContainer>
-            </div>
-          </div>
 
           {/* Table */}
           <div className="card p-6 rounded-2xl">

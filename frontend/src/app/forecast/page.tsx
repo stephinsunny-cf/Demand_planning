@@ -5,6 +5,7 @@ import Layout from '@/components/Layout'
 import DataTable from '@/components/DataTable'
 import ExportButton from '@/components/ExportButton'
 import MultiSelect from '@/components/MultiSelect'
+import SingleSelect from '@/components/SingleSelect'
 import LoadingSpinner from '@/components/LoadingSpinner'
 import api from '@/lib/api'
 
@@ -19,6 +20,7 @@ export default function ForecastPage() {
   const [selectedLocations, setSelectedLocations] = useState<string[]>([])
   const [selectedOutlets,   setSelectedOutlets]   = useState<string[]>([])
   const [skuSearch,         setSkuSearch]         = useState('')
+  const [forecastDays,      setForecastDays]      = useState(7)
   const [isLoading,         setIsLoading]         = useState(true)
 
   // Load filter metadata
@@ -40,16 +42,17 @@ export default function ForecastPage() {
     const params = new URLSearchParams()
     if (selectedLocations.length > 0) params.set('locations', selectedLocations.join(','))
     if (selectedOutlets.length > 0) params.set('outlets', selectedOutlets.join(','))
+    params.set('days', forecastDays.toString())
     
     api.get(`/api/forecast/all?${params}`).then(r => {
       const rows = r.data as Record<string, unknown>[]
-      const totalVolume = rows.reduce((sum, row) => sum + Number(row.total_predicted_7d || 0), 0)
+      const totalVolume = rows.reduce((sum, row) => sum + Number(row.total_predicted || 0), 0)
       const enrichedRows = rows.map(row => ({
         ...row,
         display_sku: row.sku_code ? `${row.sku} (${row.sku_code})` : row.sku,
         location: row.mapped_city ? String(row.mapped_city) : String(row.outlet).split(' - ')[0].trim(),
         percentage: totalVolume > 0
-          ? ((Number(row.total_predicted_7d) / totalVolume) * 100).toFixed(2)
+          ? ((Number(row.total_predicted) / totalVolume) * 100).toFixed(2)
           : '0.00',
       }))
       setAllForecasts(enrichedRows)
@@ -60,8 +63,8 @@ export default function ForecastPage() {
     })
   }
 
-  // Load initial data
-  useEffect(() => { fetchData() }, [])
+  // Load initial data and auto-reload on forecastDays change
+  useEffect(() => { fetchData() }, [forecastDays])
 
   // Derived outlets for cascaded filter
   const outletsForLocation = selectedLocations.length === 0
@@ -76,7 +79,7 @@ export default function ForecastPage() {
   // Final client-side filter for SKU search (to avoid refetching on every keystroke)
   const filteredForecasts = allForecasts
     .filter(r => skuSearch === '' || String(r.sku).toLowerCase().includes(skuSearch.toLowerCase()))
-    .sort((a, b) => Number(b.total_predicted_7d) - Number(a.total_predicted_7d))
+    .sort((a, b) => Number(b.total_predicted) - Number(a.total_predicted))
 
   return (
     <Layout title="Forecast Explorer">
@@ -104,6 +107,20 @@ export default function ForecastPage() {
                 selected={selectedOutlets} 
                 onChange={setSelectedOutlets} 
                 placeholder="All Outlets" 
+              />
+            </div>
+            
+            {/* Horizon Selector */}
+            <div className="flex flex-col gap-1 min-w-[120px]">
+              <label className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Horizon</label>
+              <SingleSelect
+                value={forecastDays}
+                onChange={setForecastDays}
+                options={[
+                  { label: '7 Days', value: 7 },
+                  { label: '14 Days', value: 14 },
+                  { label: '30 Days', value: 30 },
+                ]}
               />
             </div>
             
@@ -146,7 +163,7 @@ export default function ForecastPage() {
           <h3 className="text-sm font-semibold text-slate-900 dark:text-white mb-1">
             {selectedLocations.length === 0 ? 'Network-Wide' : selectedLocations.length === 1 ? selectedLocations[0] : `${selectedLocations.length} Locations`}
             {selectedOutlets.length > 0 && <span className="text-slate-500"> · {selectedOutlets.length === 1 ? selectedOutlets[0] : `${selectedOutlets.length} Outlets`}</span>}
-            <span className="text-slate-500 font-normal"> — 7-Day Forecast</span>
+            <span className="text-slate-500 font-normal"> — {forecastDays}-Day Forecast</span>
           </h3>
           <p className="text-xs text-slate-400 mb-4">Sorted by highest forecasted demand first</p>
           {isLoading ? (
@@ -156,7 +173,7 @@ export default function ForecastPage() {
               columns={[
                 { key: 'display_sku', label: 'Product SKU', sortable: true },
                 { key: 'outlet', label: 'Outlet', sortable: true },
-                { key: 'total_predicted_7d', label: '7-Day Forecast Qty', sortable: true, render: v => Number(v).toFixed(1) },
+                { key: 'total_predicted', label: `${forecastDays}-Day Forecast Qty`, sortable: true, render: v => Number(v).toFixed(1) },
                 { key: 'percentage', label: '% of Total Demand', sortable: true, render: v => <span className="text-emerald-500 font-medium">{v}%</span> },
               ]}
               data={filteredForecasts}
