@@ -22,11 +22,17 @@ api.interceptors.request.use((config) => {
   return config
 })
 
-// Handle 401 — redirect to login
+// Handle 401 — clear token, sign out, and redirect to login
 api.interceptors.response.use(
   (res) => res,
-  (error) => {
+  async (error) => {
     if (error.response?.status === 401 && typeof window !== 'undefined') {
+      localStorage.removeItem('sb-token')
+      
+      // We must dynamically import supabase to avoid circular dependencies if any
+      const { supabase } = await import('./supabase')
+      await supabase.auth.signOut()
+      
       window.location.href = '/login'
     }
     return Promise.reject(error)
