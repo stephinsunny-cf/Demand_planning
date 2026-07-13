@@ -16,15 +16,13 @@ export default function Layout({ title, children }: Props) {
   const { user, loading } = useAuth()
   const router = useRouter()
 
-  const DEMO_MODE = process.env.NEXT_PUBLIC_DEMO_MODE === 'true'
-
   useEffect(() => {
-    if (!DEMO_MODE && !loading && !user) {
+    if (!loading && !user) {
       router.push('/login')
     }
-  }, [user, loading, router, DEMO_MODE])
+  }, [user, loading, router])
 
-  if (!DEMO_MODE && loading) {
+  if (loading) {
     return (
       <div className="min-h-screen bg-slate-50 dark:bg-slate-950 flex items-center justify-center">
         <LoadingSpinner />
@@ -32,7 +30,7 @@ export default function Layout({ title, children }: Props) {
     )
   }
 
-  if (!DEMO_MODE && !user) return null
+  if (!user) return null
 
   return (
     <div className="min-h-screen flex bg-white dark:bg-slate-950 text-slate-900 dark:text-white transition-colors">

@@ -2,9 +2,6 @@
 backend/auth.py
 ────────────────
 Supabase JWT verification and role extraction.
-
-In DEMO_MODE (env DEMO_MODE=true), auth is bypassed and a super_admin
-user is injected for local development without Supabase.
 """
 
 import os
@@ -16,11 +13,10 @@ from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 
 log = logging.getLogger(__name__)
 
-DEMO_MODE = os.getenv("DEMO_MODE", "false").lower() == "true"
 SUPABASE_URL = os.getenv("SUPABASE_URL", "")
 SUPABASE_KEY = os.getenv("SUPABASE_KEY", "")
 
-security = HTTPBearer(auto_error=not DEMO_MODE)
+security = HTTPBearer()
 
 
 class UserContext:
@@ -31,9 +27,6 @@ class UserContext:
 
     def has_role(self, *allowed_roles: str) -> bool:
         return self.role in allowed_roles or self.role == "super_admin"
-
-
-DEMO_USER = UserContext("demo-user-id", "demo@curefoods.com", "super_admin")
 
 # Role access map — which roles can access which resources
 ROLE_ACCESS = {
@@ -50,9 +43,7 @@ ROLE_ACCESS = {
 async def get_current_user(
     credentials: Optional[HTTPAuthorizationCredentials] = Depends(security),
 ) -> UserContext:
-    """Verify Supabase JWT and return UserContext. Bypassed in DEMO_MODE."""
-    if DEMO_MODE:
-        return DEMO_USER
+    """Verify Supabase JWT and return UserContext."""
 
     if not credentials:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Not authenticated")
