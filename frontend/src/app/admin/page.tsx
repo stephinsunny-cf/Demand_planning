@@ -186,10 +186,23 @@ export default function AdminPage() {
 }
 
 function UserManagement() {
-  const [users, setUsers] = useState<Record<string, unknown>[]>([])
-  useEffect(() => {
+  const [users, setUsers] = useState<Record<string, any>[]>([])
+  const [updatingId, setUpdatingId] = useState<string | null>(null)
+
+  const fetchUsers = () => {
     api.get('/api/admin/users').then(r => setUsers(r.data)).catch(() => {})
+  }
+
+  useEffect(() => {
+    fetchUsers()
   }, [])
+
+  const updateRole = async (userId: string, newRole: string) => {
+    setUpdatingId(userId)
+    await api.put(`/api/admin/users/${userId}`, { role: newRole }).catch(console.error)
+    fetchUsers()
+    setUpdatingId(null)
+  }
 
   return (
     <div className="card p-6 rounded-2xl">
@@ -201,7 +214,7 @@ function UserManagement() {
       </div>
       <div className="grid gap-2">
         {users.map((u, i) => (
-          <div key={i} className="flex items-center justify-between p-4 rounded-xl bg-white dark:bg-slate-900/60 border border-slate-200 dark:border-slate-800">
+          <div key={String(u.id || i)} className="flex items-center justify-between p-4 rounded-xl bg-white dark:bg-slate-900/60 border border-slate-200 dark:border-slate-800">
             <div className="flex items-center gap-3">
               <div className="w-8 h-8 rounded-full bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center">
                 <span className="text-emerald-400 text-xs font-bold">
@@ -213,9 +226,20 @@ function UserManagement() {
                 <p className="text-xs text-slate-500">User since {String(u.created_at || '').slice(0, 10)}</p>
               </div>
             </div>
-            <span className="text-xs px-2.5 py-1 rounded-full bg-slate-100 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 text-slate-500 dark:text-slate-400 capitalize">
-              {String(u.role).replace('_', ' ')}
-            </span>
+            
+            <div className="flex items-center gap-2">
+              <select 
+                value={String(u.role)}
+                onChange={(e) => updateRole(String(u.id), e.target.value)}
+                disabled={updatingId === u.id}
+                className="text-xs px-2.5 py-1.5 rounded-lg bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 font-medium focus:outline-none focus:border-sky-500 cursor-pointer disabled:opacity-50"
+              >
+                <option value="viewer">Viewer (Read Only)</option>
+                <option value="editor">Editor (Write Access)</option>
+                <option value="super_admin">Super Admin</option>
+              </select>
+              {updatingId === u.id && <RefreshCw size={14} className="animate-spin text-slate-400" />}
+            </div>
           </div>
         ))}
       </div>

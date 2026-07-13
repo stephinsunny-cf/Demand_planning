@@ -30,14 +30,12 @@ class UserContext:
 
 # Role access map — which roles can access which resources
 ROLE_ACCESS = {
-    "super_admin":      {"*"},
-    "planning_manager": {"dashboard", "sales", "forecast", "supply", "warehouse", "procurement", "alerts", "reports"},
-    "demand_planner":   {"dashboard", "sales", "forecast", "supply", "alerts", "reports"},
-    "procurement":      {"dashboard", "warehouse", "procurement", "alerts"},
-    "kitchen_ops":      {"dashboard", "supply", "warehouse"},
-    "culinary_team":    {"dashboard", "recipes"},
-    "leadership":       {"dashboard", "reports"},
+    "super_admin": {"*"},
+    "editor":      {"dashboard", "sales", "forecast", "supply", "warehouse", "procurement", "alerts", "reports", "recipes"},
+    "viewer":      {"dashboard", "reports", "alerts"},
 }
+
+FIRST_ADMIN_EMAIL = os.getenv("FIRST_ADMIN_EMAIL", "")
 
 
 async def get_current_user(
@@ -62,8 +60,12 @@ async def get_current_user(
         role = (
             user.user_metadata.get("role")
             or user.app_metadata.get("role")
-            or "demand_planner"  # default role
+            or "viewer"  # default role
         )
+        
+        # Bootstrap: Auto-promote the first admin based on email
+        if FIRST_ADMIN_EMAIL and user.email and user.email.lower() == FIRST_ADMIN_EMAIL.lower():
+            role = "super_admin"
         return UserContext(user.id, user.email, role)
 
     except HTTPException:
