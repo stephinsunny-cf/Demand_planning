@@ -1,6 +1,6 @@
 // src/app/login/page.tsx
 'use client'
-import { useEffect } from 'react'
+import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { Globe, Zap, BarChart2, Shield } from 'lucide-react'
 import { useAuth } from '@/hooks/useAuth'
