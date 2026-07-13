@@ -44,8 +44,6 @@ logging.basicConfig(
 )
 log = logging.getLogger("backend.main")
 
-DEMO_MODE = os.getenv("DEMO_MODE", "false").lower() == "true"
-
 app = FastAPI(
     title="Curefoods Demand Planning Engine",
     description="Internal demand forecasting and supply planning platform for Curefoods.",
@@ -92,7 +90,6 @@ async def health():
 
     return {
         "status":    "ok" if db_ok else "degraded",
-        "demo_mode": DEMO_MODE,
         "database":  "connected" if db_ok else "unavailable",
         "version":   "1.0.0",
     }

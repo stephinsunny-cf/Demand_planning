@@ -8,18 +8,16 @@ import { useAuth } from '@/hooks/useAuth'
 export default function LoginPage() {
   const { user, loading, signInWithGoogle, signInWithEmail } = useAuth()
   const router = useRouter()
-  const DEMO   = process.env.NEXT_PUBLIC_DEMO_MODE === 'true'
-
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [errorMsg, setErrorMsg] = useState('')
   const [isSubmitting, setIsSubmitting] = useState(false)
 
   useEffect(() => {
-    if (DEMO || (!loading && user)) {
+    if (!loading && user) {
       router.push('/dashboard')
     }
-  }, [user, loading, router, DEMO])
+  }, [user, loading, router])
 
   const handleEmailLogin = async (e: React.FormEvent) => {
     e.preventDefault()

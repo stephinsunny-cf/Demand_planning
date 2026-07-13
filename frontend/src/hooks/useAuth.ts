@@ -13,15 +13,7 @@ export function useAuth() {
   const [user, setUser]       = useState<AuthUser | null>(null)
   const [loading, setLoading] = useState(true)
 
-  const DEMO_MODE = process.env.NEXT_PUBLIC_DEMO_MODE === 'true'
-
   useEffect(() => {
-    if (DEMO_MODE) {
-      setUser({ id: 'demo', email: 'demo@curefoods.com', role: 'super_admin' })
-      setLoading(false)
-      return
-    }
-
     supabase.auth.getSession().then(({ data: { session } }) => {
       if (session?.user) {
         const role = session.user.user_metadata?.role || 'demand_planner'
@@ -44,7 +36,7 @@ export function useAuth() {
     })
 
     return () => listener.subscription.unsubscribe()
-  }, [DEMO_MODE])
+  }, [])
 
   const signInWithGoogle = useCallback(async () => {
     await supabase.auth.signInWithOAuth({ provider: 'google' })
