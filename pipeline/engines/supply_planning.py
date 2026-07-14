@@ -23,8 +23,7 @@ log = logging.getLogger(__name__)
 IST = timezone(timedelta(hours=5, minutes=30))
 DEFAULT_SAFETY_STOCK_DAYS = 7.0
 
-def log_pipeline_run(job_name: str, started_at: datetime, status: str, rows_processed: int = 0, error_message: str = ""):
-    pass # Disabling logging for now until pipeline_runs is created in PG
+from pipeline.loaders.postgres import log_pipeline_run
 
 def run() -> pd.DataFrame:
     """

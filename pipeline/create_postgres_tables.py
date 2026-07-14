@@ -99,6 +99,17 @@ DDL_STATEMENTS = [
         run_date        DATE,
         inserted_at     TIMESTAMP DEFAULT CURRENT_TIMESTAMP
     )
+    """,
+    """
+    CREATE TABLE IF NOT EXISTS pipeline_runs (
+        id              SERIAL PRIMARY KEY,
+        job_name        VARCHAR(100),
+        started_at      TIMESTAMP,
+        completed_at    TIMESTAMP,
+        status          VARCHAR(50),
+        rows_processed  INT,
+        error_message   TEXT
+    )
     """
 ]
 
