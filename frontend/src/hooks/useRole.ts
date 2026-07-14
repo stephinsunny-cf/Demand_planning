@@ -3,13 +3,9 @@
 import { useAuth } from './useAuth'
 
 const ROLE_ACCESS: Record<string, string[]> = {
-  super_admin:      ['*'],
-  planning_manager: ['dashboard','sales','forecast','supply','warehouse','procurement','tracker','alerts','reports'],
-  demand_planner:   ['dashboard','sales','forecast','supply','alerts','reports'],
-  procurement:      ['dashboard','warehouse','procurement','tracker','alerts'],
-  kitchen_ops:      ['dashboard','supply','warehouse'],
-  culinary_team:    ['dashboard','recipes'],
-  leadership:       ['dashboard','reports'],
+  super_admin: ['*'],
+  editor:      ['dashboard', 'sales', 'forecast', 'supply', 'warehouse', 'procurement', 'alerts', 'reports', 'recipes'],
+  viewer:      ['dashboard', 'reports', 'alerts'],
 }
 
 export function useRole() {
@@ -23,8 +19,8 @@ export function useRole() {
   }
 
   const isAdmin      = role === 'super_admin'
-  const canEdit      = ['super_admin', 'planning_manager', 'culinary_team'].includes(role)
-  const canProcure   = ['super_admin', 'procurement'].includes(role)
+  const canEdit      = ['super_admin', 'editor'].includes(role)
+  const canProcure   = ['super_admin', 'editor'].includes(role)
 
   return { role, canAccess, isAdmin, canEdit, canProcure, loading }
 }
