@@ -386,12 +386,24 @@ def pull_vendor_master() -> pd.DataFrame:
 
 # ── Dummy data fallbacks ──────────────────────────────────────────────────────
 
-INGREDIENTS = [
-    ("Paneer", "g"), ("Chicken", "g"), ("Basmati Rice", "g"), ("Tomato Puree", "ml"),
-    ("Butter", "g"), ("Maida", "g"), ("Mozzarella", "g"), ("Black Lentils", "g"),
-    ("Biryani Masala", "g"), ("Whole Wheat Wrap", "g"), ("Potato", "g"),
-    ("Onion", "g"), ("Cooking Oil", "ml"), ("Salt", "g"), ("Ginger Garlic Paste", "g"),
-]
+def _get_tracker_ingredients():
+    try:
+        import sys, os
+        sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
+        from backend.database import query_df
+        pt_df = query_df("SELECT ingredient FROM procurement_tracker")
+        if not pt_df.empty:
+            return [(x, "g") for x in pt_df["ingredient"].tolist()]
+    except Exception:
+        pass
+    return [
+        ("Paneer", "g"), ("Chicken", "g"), ("Basmati Rice", "g"), ("Tomato Puree", "ml"),
+        ("Butter", "g"), ("Maida", "g"), ("Mozzarella", "g"), ("Black Lentils", "g"),
+        ("Biryani Masala", "g"), ("Whole Wheat Wrap", "g"), ("Potato", "g"),
+        ("Onion", "g"), ("Cooking Oil", "ml"), ("Salt", "g"), ("Ginger Garlic Paste", "g"),
+    ]
+
+INGREDIENTS = _get_tracker_ingredients()
 KITCHENS = ["Koramangala", "Indiranagar", "HSR Layout", "Whitefield", "JP Nagar"]
 VENDORS = ["FreshVeggies Co", "DairyBest", "StarDry Goods", "SpiceKing", "MeatPrime"]
 
