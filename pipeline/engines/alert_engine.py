@@ -79,8 +79,8 @@ def run() -> list:
                 SELECT kitchen, ingredient, qty_available
                 FROM fact_kitchen_stock
                 WHERE qty_available <= 0
-                AND (kitchen, ingredient, snapshot_time) IN (
-                  SELECT kitchen, ingredient, max(snapshot_time)
+                AND (kitchen, ingredient, snapshot_date) IN (
+                  SELECT kitchen, ingredient, max(snapshot_date)
                   FROM fact_kitchen_stock GROUP BY kitchen, ingredient
                 )
             """)
