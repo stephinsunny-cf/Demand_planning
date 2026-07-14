@@ -47,7 +47,7 @@ log = logging.getLogger("pipeline.main")
 from pipeline.extractors   import urbanpiper, supplynote
 from pipeline.transformers import clean
 from pipeline.transformers import uom_converter
-from pipeline.loaders      import clickhouse as loader
+from pipeline.loaders      import postgres as loader
 from pipeline.engines      import (
     sales_aggregation,
     forecast_engine,
