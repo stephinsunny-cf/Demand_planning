@@ -2,7 +2,7 @@
 
 from datetime import datetime, timezone, timedelta
 from typing import Optional
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Request
 from pydantic import BaseModel
 
 from backend.auth     import require_role, UserContext
@@ -124,10 +124,27 @@ async def get_pipeline_status(user: UserContext = Depends(require_role("super_ad
 
 
 @router.post("/admin/pipeline/trigger")
-async def trigger_pipeline(user: UserContext = Depends(require_role("super_admin"))):
+async def trigger_pipeline(
+    request: Request,
+    user: UserContext = Depends(require_role("super_admin")),
+):
     """Manually trigger a full pipeline run (non-blocking)."""
-    import threading
-    import sys
+    return await _run_pipeline()
+
+
+@router.post("/admin/pipeline/trigger-cron")
+async def trigger_pipeline_cron(request: Request):
+    """Cron-triggered pipeline run — authenticated via PIPELINE_TOKEN secret."""
+    import os
+    expected = os.getenv("PIPELINE_TOKEN", "")
+    provided = request.headers.get("Authorization", "").removeprefix("Bearer ").strip()
+    if not expected or provided != expected:
+        raise HTTPException(status_code=403, detail="Invalid or missing pipeline token")
+    return await _run_pipeline()
+
+
+async def _run_pipeline():
+    import threading, sys
     from pathlib import Path
     sys.path.insert(0, str(Path(__file__).parent.parent.parent))
 
@@ -138,4 +155,4 @@ async def trigger_pipeline(user: UserContext = Depends(require_role("super_admin
 
     thread = threading.Thread(target=run_in_background, daemon=True)
     thread.start()
-    return {"success": True, "message": "Pipeline triggered in background"}
+    return {"success": True, "message": "Pipeline triggered in background", "time": __import__("datetime").datetime.utcnow().isoformat()}
