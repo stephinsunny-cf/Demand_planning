@@ -354,6 +354,22 @@ def _generate_dummy_menu() -> pd.DataFrame:
 
 
 def _generate_dummy_recipes() -> pd.DataFrame:
+    try:
+        import sys, os
+        sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
+        from backend.database import query_df
+        pt_df = query_df("SELECT ingredient FROM procurement_tracker")
+        if not pt_df.empty:
+            tracker_items = pt_df["ingredient"].tolist()
+            dishes = ["Paneer Butter Masala", "Chicken Biryani", "Veg Biryani", "Dal Makhani", "Butter Naan", "Chicken Tikka", "Pizza Margherita", "Protein Wrap", "Masala Dosa"]
+            recipes = []
+            for i, item in enumerate(tracker_items):
+                dish = dishes[i % len(dishes)]
+                recipes.append((dish, item, 100, "g", 0.95))
+            return pd.DataFrame(recipes, columns=["dish_name", "ingredient", "qty_per_portion", "unit", "yield_factor"])
+    except Exception as e:
+        pass
+
     recipes = [
         ("Paneer Butter Masala", "Paneer", 200, "g", 0.95),
         ("Paneer Butter Masala", "Tomato Puree", 100, "ml", 1.0),
