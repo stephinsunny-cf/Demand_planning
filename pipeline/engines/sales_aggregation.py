@@ -12,7 +12,7 @@ from datetime import datetime, timezone, timedelta
 
 import pandas as pd
 
-from pipeline.loaders.clickhouse import insert_df, query_df, get_local_client, log_pipeline_run
+from pipeline.loaders.postgres import insert_df, query_df, get_local_client, log_pipeline_run
 
 log = logging.getLogger(__name__)
 IST = timezone(timedelta(hours=5, minutes=30))
@@ -22,7 +22,7 @@ def run(orders_df: pd.DataFrame = None, items_df: pd.DataFrame = None) -> pd.Dat
     """
     Run sales aggregation engine.
 
-    If orders_df / items_df are not provided, reads from local ClickHouse staging tables.
+    If orders_df / items_df are not provided, reads from local PostgreSQL staging tables.
     Returns the aggregated fact_daily_sales DataFrame.
     """
     started_at = datetime.now(IST)
@@ -111,7 +111,7 @@ def run(orders_df: pd.DataFrame = None, items_df: pd.DataFrame = None) -> pd.Dat
                  agg["sku"].nunique(),
                  agg["outlet"].nunique())
 
-        # Write to ClickHouse
+        # Write to PostgreSQL
         rows_inserted = insert_df(agg, "fact_daily_sales", client=client)
         log_pipeline_run("sales_aggregation", started_at, "SUCCESS", rows_inserted, client=client)
         client.close()
