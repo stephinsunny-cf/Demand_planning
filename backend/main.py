@@ -13,6 +13,7 @@ import os
 import sys
 import logging
 from pathlib import Path
+from contextlib import asynccontextmanager
 
 # Ensure project root is on sys.path
 sys.path.insert(0, str(Path(__file__).parent.parent))
@@ -23,6 +24,9 @@ load_dotenv()
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
+from apscheduler.schedulers.asyncio import AsyncIOScheduler
+from apscheduler.triggers.cron import CronTrigger
+import pytz
 
 from backend.routers import (
     dashboard,
@@ -44,7 +48,42 @@ logging.basicConfig(
 )
 log = logging.getLogger("backend.main")
 
+
+def run_daily_pipeline():
+    """Runs automatically every day at 2:00 AM IST."""
+    log.info("⏰ Scheduled pipeline starting (2:00 AM IST)...")
+    try:
+        use_dummy = os.getenv("USE_DUMMY_DATA", "false").lower() == "true"
+        from pipeline.main import run_full_pipeline
+        run_full_pipeline(use_dummy=use_dummy)
+        log.info("✅ Scheduled pipeline completed successfully.")
+    except Exception as exc:
+        log.error("❌ Scheduled pipeline failed: %s", exc)
+
+
+# ── Scheduler lifespan ────────────────────────────────────────────────────────
+scheduler = AsyncIOScheduler(timezone=pytz.utc)
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    # Start scheduler when server boots
+    IST = pytz.timezone("Asia/Kolkata")
+    scheduler.add_job(
+        run_daily_pipeline,
+        CronTrigger(hour=2, minute=0, timezone=IST),  # 2:00 AM IST
+        id="daily_pipeline",
+        replace_existing=True,
+    )
+    scheduler.start()
+    log.info("✅ Scheduler started — pipeline will run daily at 2:00 AM IST")
+    yield
+    # Shutdown cleanly
+    scheduler.shutdown(wait=False)
+    log.info("Scheduler stopped.")
+
+
 app = FastAPI(
+    lifespan=lifespan,
     title="Curefoods Demand Planning Engine",
     description="Internal demand forecasting and supply planning platform for Curefoods.",
     version="1.0.0",
