@@ -16,7 +16,10 @@ export function useAuth() {
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => {
       if (session?.user) {
-        const role = session.user.user_metadata?.role || 'demand_planner'
+        let role = session.user.user_metadata?.role || 'viewer'
+        if (process.env.NEXT_PUBLIC_ADMIN_EMAIL && session.user.email?.toLowerCase() === process.env.NEXT_PUBLIC_ADMIN_EMAIL.toLowerCase()) {
+          role = 'super_admin'
+        }
         const token = session.access_token
         localStorage.setItem('sb-token', token)
         setUser({ id: session.user.id, email: session.user.email!, role })
@@ -26,7 +29,10 @@ export function useAuth() {
 
     const { data: listener } = supabase.auth.onAuthStateChange((_event, session) => {
       if (session?.user) {
-        const role = session.user.user_metadata?.role || 'demand_planner'
+        let role = session.user.user_metadata?.role || 'viewer'
+        if (process.env.NEXT_PUBLIC_ADMIN_EMAIL && session.user.email?.toLowerCase() === process.env.NEXT_PUBLIC_ADMIN_EMAIL.toLowerCase()) {
+          role = 'super_admin'
+        }
         localStorage.setItem('sb-token', session.access_token)
         setUser({ id: session.user.id, email: session.user.email!, role })
       } else {
