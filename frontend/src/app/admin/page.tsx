@@ -1,6 +1,6 @@
 // src/app/admin/page.tsx
 'use client'
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import Layout from '@/components/Layout'
 import LoadingSpinner from '@/components/LoadingSpinner'
 import api from '@/lib/api'
@@ -8,7 +8,7 @@ import { useRole } from '@/hooks/useRole'
 import { useRouter } from 'next/navigation'
 import {
   Users, Settings, Play, CheckCircle2, XCircle,
-  AlertCircle, RefreshCw, Shield,
+  AlertCircle, RefreshCw, Shield, ChevronDown,
 } from 'lucide-react'
 import { clsx } from 'clsx'
 
@@ -185,25 +185,97 @@ export default function AdminPage() {
   )
 }
 
+function RoleDropdown({ value, onChange, disabled }: { value: string, onChange: (v: string) => void, disabled: boolean }) {
+  const [isOpen, setIsOpen] = useState(false)
+  const ref = useRef<HTMLDivElement>(null)
+  const options = [
+    { label: 'Viewer (Read Only)', value: 'viewer' },
+    { label: 'Editor (Write Access)', value: 'editor' },
+    { label: 'Super Admin', value: 'super_admin' },
+  ]
+  const selected = options.find(o => o.value === value)
+
+  useEffect(() => {
+    function handleClickOutside(e: MouseEvent) {
+      if (ref.current && !ref.current.contains(e.target as Node)) setIsOpen(false)
+    }
+    document.addEventListener('mousedown', handleClickOutside)
+    return () => document.removeEventListener('mousedown', handleClickOutside)
+  }, [])
+
+  return (
+    <div className="relative" ref={ref}>
+      <button
+        type="button"
+        disabled={disabled}
+        onClick={() => setIsOpen(!isOpen)}
+        className="flex items-center justify-between gap-2 bg-white border-2 border-cyan-500 rounded-xl px-3 py-1.5 text-sm font-medium text-slate-700 focus:outline-none focus:ring-4 focus:ring-cyan-500/20 transition-all shadow-sm hover:border-cyan-400 disabled:opacity-50 min-w-[160px]"
+      >
+        <span className="truncate">{selected?.label || 'Select Role'}</span>
+        <ChevronDown size={14} className={`text-slate-500 transition-transform flex-shrink-0 ${isOpen ? 'rotate-180' : ''}`} />
+      </button>
+      {isOpen && (
+        <div className="absolute right-0 z-50 mt-2 w-52 bg-white border border-slate-200 rounded-xl shadow-xl overflow-hidden">
+          <div className="p-1">
+            {options.map(opt => {
+              const isSelected = opt.value === value
+              return (
+                <button
+                  key={opt.value}
+                  type="button"
+                  onClick={() => { onChange(opt.value); setIsOpen(false) }}
+                  className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm transition-colors text-left
+                    ${isSelected ? 'bg-emerald-500/10 text-emerald-700 font-medium' : 'text-slate-700 hover:bg-slate-50'}`}
+                >
+                  <div className={`w-4 h-4 rounded-full border flex items-center justify-center flex-shrink-0 transition-colors
+                    ${isSelected ? 'bg-emerald-500 border-emerald-500' : 'border-slate-300 bg-white'}`}>
+                    {isSelected && <div className="w-1.5 h-1.5 rounded-full bg-white" />}
+                  </div>
+                  {opt.label}
+                </button>
+              )
+            })}
+          </div>
+        </div>
+      )}
+    </div>
+  )
+}
+
 function UserManagement() {
   const [users, setUsers] = useState<Record<string, any>[]>([])
   const [updatingId, setUpdatingId] = useState<string | null>(null)
   const [inviteEmail, setInviteEmail] = useState('')
   const [inviting, setInviting] = useState(false)
+  const [inviteMsg, setInviteMsg] = useState('')
 
   const fetchUsers = () => {
     api.get('/api/admin/users').then(r => setUsers(r.data)).catch(() => {})
   }
 
-  useEffect(() => {
-    fetchUsers()
-  }, [])
+  useEffect(() => { fetchUsers() }, [])
 
   const updateRole = async (userId: string, newRole: string) => {
     setUpdatingId(userId)
     await api.put(`/api/admin/users/${userId}`, { role: newRole }).catch(console.error)
     fetchUsers()
     setUpdatingId(null)
+  }
+
+  const inviteUser = async () => {
+    if (!inviteEmail) return
+    setInviting(true)
+    setInviteMsg('')
+    try {
+      await api.post('/api/admin/users', { email: inviteEmail, role: 'viewer' })
+      setInviteMsg(`✓ Invite sent to ${inviteEmail}`)
+      setInviteEmail('')
+      fetchUsers()
+    } catch {
+      setInviteMsg('✗ Failed to send invite. Please check the email and try again.')
+    }
+    setInviting(false)
+    setTimeout(() => setInviteMsg(''), 5000)
   }
 
   return (
@@ -213,59 +285,59 @@ function UserManagement() {
           <div className="p-2.5 rounded-xl bg-sky-500/10 border border-sky-500/20">
             <Users size={18} className="text-sky-400" />
           </div>
-          <h2 className="text-base font-semibold text-slate-900 dark:text-white">Users ({users.length})</h2>
+          <h2 className="text-base font-semibold text-slate-900">Users ({users.length})</h2>
         </div>
-        
-        <div className="flex items-center gap-2">
-          <input
-            type="email"
-            placeholder="Invite email..."
-            value={inviteEmail}
-            onChange={(e) => setInviteEmail(e.target.value)}
-            className="w-48 px-3 py-1.5 text-sm rounded-lg bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white focus:outline-none focus:border-sky-500"
-          />
-          <button
-            onClick={async () => {
-              if (!inviteEmail) return
-              setInviting(true)
-              await api.post('/api/admin/users', { email: inviteEmail, role: 'viewer' }).catch(console.error)
-              setInviteEmail('')
-              fetchUsers()
-              setInviting(false)
-            }}
-            disabled={inviting || !inviteEmail}
-            className="px-3 py-1.5 text-sm font-medium rounded-lg bg-sky-500 hover:bg-sky-400 text-white disabled:opacity-50 transition-colors"
-          >
-            {inviting ? 'Sending...' : 'Invite'}
-          </button>
+
+        <div className="flex flex-col items-end gap-1">
+          <div className="flex items-center gap-2">
+            <input
+              type="email"
+              placeholder="Invite by email..."
+              value={inviteEmail}
+              onChange={(e) => setInviteEmail(e.target.value)}
+              onKeyDown={(e) => e.key === 'Enter' && inviteUser()}
+              className="w-52 px-3 py-1.5 text-sm rounded-xl bg-white border-2 border-slate-200 text-slate-900 focus:outline-none focus:border-cyan-500 transition-colors"
+            />
+            <button
+              onClick={inviteUser}
+              disabled={inviting || !inviteEmail}
+              className="px-4 py-1.5 text-sm font-medium rounded-xl bg-sky-500 hover:bg-sky-400 text-white disabled:opacity-50 transition-colors"
+            >
+              {inviting ? 'Sending...' : 'Invite'}
+            </button>
+          </div>
+          {inviteMsg && (
+            <p className={`text-xs ${inviteMsg.startsWith('✓') ? 'text-emerald-600' : 'text-rose-500'}`}>
+              {inviteMsg}
+            </p>
+          )}
         </div>
       </div>
+
       <div className="grid gap-2">
+        {users.length === 0 && (
+          <p className="text-slate-400 text-sm text-center py-8">No users found. Use the Invite button above to add your team!</p>
+        )}
         {users.map((u, i) => (
-          <div key={String(u.id || i)} className="flex items-center justify-between p-4 rounded-xl bg-white dark:bg-slate-900/60 border border-slate-200 dark:border-slate-800">
+          <div key={String(u.id || i)} className="flex items-center justify-between p-4 rounded-xl bg-white border border-slate-100 shadow-sm">
             <div className="flex items-center gap-3">
-              <div className="w-8 h-8 rounded-full bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center">
-                <span className="text-emerald-400 text-xs font-bold">
+              <div className="w-9 h-9 rounded-full bg-sky-500/10 border border-sky-500/20 flex items-center justify-center">
+                <span className="text-sky-500 text-sm font-bold">
                   {String(u.email || '?').charAt(0).toUpperCase()}
                 </span>
               </div>
               <div>
-                <p className="text-sm font-medium text-slate-900 dark:text-white">{String(u.email)}</p>
-                <p className="text-xs text-slate-500">User since {String(u.created_at || '').slice(0, 10)}</p>
+                <p className="text-sm font-medium text-slate-900">{String(u.email)}</p>
+                <p className="text-xs text-slate-400">Member since {String(u.created_at || '').slice(0, 10)}</p>
               </div>
             </div>
-            
+
             <div className="flex items-center gap-2">
-              <select 
+              <RoleDropdown
                 value={String(u.role)}
-                onChange={(e) => updateRole(String(u.id), e.target.value)}
+                onChange={(newRole) => updateRole(String(u.id), newRole)}
                 disabled={updatingId === u.id}
-                className="text-xs px-2.5 py-1.5 rounded-lg bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 font-medium focus:outline-none focus:border-sky-500 cursor-pointer disabled:opacity-50"
-              >
-                <option value="viewer">Viewer (Read Only)</option>
-                <option value="editor">Editor (Write Access)</option>
-                <option value="super_admin">Super Admin</option>
-              </select>
+              />
               {updatingId === u.id && <RefreshCw size={14} className="animate-spin text-slate-400" />}
             </div>
           </div>
