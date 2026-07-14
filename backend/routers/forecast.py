@@ -135,12 +135,12 @@ async def get_forecast_all(
     df = query_df(f"""
         WITH forecast_agg AS (
             SELECT 
-                f.sku as ingredient,
+                f.ingredient,
                 f.outlet,
-                SUM(f.qty_predicted) as agg_qty
-            FROM fact_forecast f
+                SUM(f.total_qty_needed) as agg_qty
+            FROM fact_ingredient_demand f
             WHERE {where_sql}
-            GROUP BY f.sku, f.outlet
+            GROUP BY f.ingredient, f.outlet
         )
         SELECT 
             pt.ingredient AS sku,
