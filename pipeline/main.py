@@ -60,76 +60,82 @@ from pipeline.engines      import (
 )
 
 
-def run_full_pipeline(use_dummy: bool = False):
+def run_full_pipeline(use_dummy: bool = False, skip_extract: bool = False):
     """Execute the complete demand planning data pipeline."""
     started_at = datetime.now(IST)
     log.info("╔══════════════════════════════════════════════════════╗")
     log.info("║   CUREFOODS DEMAND PLANNING PIPELINE — START         ║")
     log.info("╚══════════════════════════════════════════════════════╝")
     log.info("Mode: %s", "DUMMY DATA" if use_dummy else "LIVE DATA")
+    if skip_extract:
+        log.info("Extraction skipped. Processing existing database records.")
     log.info("Started at: %s", started_at.strftime("%Y-%m-%d %H:%M:%S %Z"))
 
-    # ── STEP 1: EXTRACT ───────────────────────────────────────────────────────
-    log.info("\n── STEP 1: EXTRACT ──────────────────────────────────────")
+    if not skip_extract:
+        # ── STEP 1: EXTRACT ───────────────────────────────────────────────────────
+        log.info("\n── STEP 1: EXTRACT ──────────────────────────────────────")
 
-    log.info("Extracting from UrbanPiper...")
-    up_data = urbanpiper.extract_all(use_dummy=use_dummy)
+        log.info("Extracting from UrbanPiper...")
+        up_data = urbanpiper.extract_all(use_dummy=use_dummy)
 
-    log.info("Extracting from SupplyNote...")
-    sn_data = supplynote.extract_all(use_dummy=use_dummy)
+        log.info("Extracting from SupplyNote...")
+        sn_data = supplynote.extract_all(use_dummy=use_dummy)
 
-    # ── STEP 2: TRANSFORM / CLEAN ─────────────────────────────────────────────
-    log.info("\n── STEP 2: CLEAN & TRANSFORM ────────────────────────────")
+        # ── STEP 2: TRANSFORM / CLEAN ─────────────────────────────────────────────
+        log.info("\n── STEP 2: CLEAN & TRANSFORM ────────────────────────────")
 
-    orders_clean = clean.clean_orders(up_data.get("orders"))
-    items_clean  = clean.clean_order_items(up_data.get("order_items"))
-    menu_clean   = clean.clean_menu_items(up_data.get("menu_items"))
-    recipe_clean = clean.clean_recipe_master(up_data.get("recipe_master"))
+        orders_clean = clean.clean_orders(up_data.get("orders"))
+        items_clean  = clean.clean_order_items(up_data.get("order_items"))
+        menu_clean   = clean.clean_menu_items(up_data.get("menu_items"))
+        recipe_clean = clean.clean_recipe_master(up_data.get("recipe_master"))
 
-    # Convert UOM on recipe master
-    recipe_clean = uom_converter.convert_df_uom(
-        recipe_clean, qty_col="qty_per_portion", unit_col="unit", ingredient_col="ingredient"
-    )
+        # Convert UOM on recipe master
+        recipe_clean = uom_converter.convert_df_uom(
+            recipe_clean, qty_col="qty_per_portion", unit_col="unit", ingredient_col="ingredient"
+        )
 
-    kitchen_stock   = clean.clean_kitchen_stock(sn_data.get("kitchen_stock"))
-    warehouse_stock = clean.clean_warehouse_stock(sn_data.get("warehouse_stock"))
-    open_pos        = clean.clean_open_pos(sn_data.get("open_pos"))
-    grn_log         = clean.clean_grn_log(sn_data.get("grn_log"))
-    vendor_master   = clean.clean_vendor_master(sn_data.get("vendor_master"))
+        kitchen_stock   = clean.clean_kitchen_stock(sn_data.get("kitchen_stock"))
+        warehouse_stock = clean.clean_warehouse_stock(sn_data.get("warehouse_stock"))
+        open_pos        = clean.clean_open_pos(sn_data.get("open_pos"))
+        grn_log         = clean.clean_grn_log(sn_data.get("grn_log"))
+        vendor_master   = clean.clean_vendor_master(sn_data.get("vendor_master"))
 
-    # Convert UOM for stock tables
-    for df in [kitchen_stock, warehouse_stock]:
-        if not df.empty and "qty_available" in df.columns and "unit" in df.columns:
-            uom_converter.convert_df_uom(df, "qty_available", "unit",
-                                          ingredient_col="ingredient" if "ingredient" in df.columns else None)
+        # Convert UOM for stock tables
+        for df in [kitchen_stock, warehouse_stock]:
+            if not df.empty and "qty_available" in df.columns and "unit" in df.columns:
+                uom_converter.convert_df_uom(df, "qty_available", "unit",
+                                              ingredient_col="ingredient" if "ingredient" in df.columns else None)
 
-    # Cross-table validation
-    unmapped = clean.flag_unmapped_skus(items_clean, menu_clean)
-    if unmapped:
-        log.warning("Found %d unmapped SKUs — check menu_items", len(unmapped))
+        # Cross-table validation
+        unmapped = clean.flag_unmapped_skus(items_clean, menu_clean)
+        if unmapped:
+            log.warning("Found %d unmapped SKUs — check menu_items", len(unmapped))
 
-    # ── STEP 3: LOAD ──────────────────────────────────────────────────────────
-    log.info("\n── STEP 3: LOAD INTO CLICKHOUSE ─────────────────────────")
+        # ── STEP 3: LOAD ──────────────────────────────────────────────────────────
+        log.info("\n── STEP 3: LOAD INTO CLICKHOUSE ─────────────────────────")
 
-    client = loader.get_local_client()
+        client = loader.get_local_client()
 
-    loader.insert_df(orders_clean,    "fact_orders_raw",    client=client)
-    loader.insert_df(items_clean,     "fact_order_items_raw", client=client)
-    loader.insert_df(menu_clean,      "dim_menu_items",     client=client)
-    loader.insert_df(recipe_clean,    "dim_recipe_master",  client=client)
-    loader.insert_df(kitchen_stock,   "fact_kitchen_stock", client=client)
-    loader.insert_df(warehouse_stock, "fact_warehouse_stock", client=client)
-    loader.insert_df(open_pos,        "fact_open_pos",      client=client)
-    loader.insert_df(grn_log,         "fact_grn_log",       client=client)
-    loader.insert_df(vendor_master,   "dim_vendor_master",  client=client)
+        loader.insert_df(orders_clean,    "fact_orders_raw",    client=client)
+        loader.insert_df(items_clean,     "fact_order_items_raw", client=client)
+        loader.insert_df(menu_clean,      "dim_menu_items",     client=client)
+        loader.insert_df(recipe_clean,    "dim_recipe_master",  client=client)
+        loader.insert_df(kitchen_stock,   "fact_kitchen_stock", client=client)
+        loader.insert_df(warehouse_stock, "fact_warehouse_stock", client=client)
+        loader.insert_df(open_pos,        "fact_open_pos",      client=client)
+        loader.insert_df(grn_log,         "fact_grn_log",       client=client)
+        loader.insert_df(vendor_master,   "dim_vendor_master",  client=client)
 
-    client.close()
+        client.close()
 
     # ── STEP 4 → 10: RUN PLANNING ENGINES ───────────────────────────────────
     log.info("\n── STEP 4-10: RUN PLANNING ENGINES ──────────────────────")
 
     log.info("\n[Engine 1] Sales Aggregation")
-    daily_sales = sales_aggregation.run(orders_df=orders_clean, items_df=items_clean)
+    if skip_extract:
+        daily_sales = sales_aggregation.run(orders_df=None, items_df=None)
+    else:
+        daily_sales = sales_aggregation.run(orders_df=orders_clean, items_df=items_clean)
 
     log.info("\n[Engine 2] Forecast Engine (Prophet)")
     forecasts = forecast_engine.run()
@@ -183,7 +189,9 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Curefoods Demand Planning Pipeline")
     parser.add_argument("--dummy", action="store_true",
                         help="Use dummy data instead of live source connections")
+    parser.add_argument("--process-only", action="store_true",
+                        help="Skip extraction and process existing database records")
     args = parser.parse_args()
 
     use_dummy = args.dummy or os.getenv("USE_DUMMY_DATA", "false").lower() == "true"
-    run_full_pipeline(use_dummy=use_dummy)
+    run_full_pipeline(use_dummy=use_dummy, skip_extract=args.process_only)
