@@ -143,7 +143,7 @@ def run_full_pipeline(use_dummy: bool = False):
     warehouse_shortage = warehouse_planning.run(ingredient_demand=ingredient_demand)
 
     log.info("\n[Engine 6] Procurement Engine")
-    procurement_recs = procurement_engine.run(warehouse_shortage=warehouse_shortage)
+    procurement_recs = procurement_engine.run()
 
     log.info("\n[Engine 7] Alert Engine")
     new_alerts = alert_engine.run()
