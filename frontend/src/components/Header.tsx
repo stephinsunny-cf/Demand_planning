@@ -36,7 +36,7 @@ export default function Header({ title }: { title: string }) {
     <header className="h-24 flex items-center justify-between px-6 sm:px-10 bg-white/90 dark:bg-slate-950/90 backdrop-blur-md sticky top-0 z-30 pt-6">
       <div>
         <h1 className="text-3xl font-bold text-slate-900 dark:text-white tracking-tight">{title}</h1>
-        {refresh && (
+        {refresh && title === 'Admin Panel' && (
           <div className={`flex items-center gap-1.5 text-[11px] ${stale ? 'text-amber-400' : 'text-slate-500'}`}>
             <Clock size={10} />
             Last refresh: {refresh}
