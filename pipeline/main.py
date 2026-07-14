@@ -47,7 +47,8 @@ log = logging.getLogger("pipeline.main")
 from pipeline.extractors   import urbanpiper, supplynote
 from pipeline.transformers import clean
 from pipeline.transformers import uom_converter
-from pipeline.loaders      import postgres as loader
+from pipeline.loaders import postgres as loader
+from pipeline.loaders.postgres import log_pipeline_run
 from pipeline.engines      import (
     sales_aggregation,
     forecast_engine,
@@ -132,21 +133,27 @@ def run_full_pipeline(use_dummy: bool = False):
 
     log.info("\n[Engine 2] Forecast Engine (Prophet)")
     forecasts = forecast_engine.run()
+    log_pipeline_run("forecast_engine", started_at, "SUCCESS", len(forecasts) if forecasts is not None else 0)
 
     log.info("\n[Engine 3] Supply Planning")
     supply_plan = supply_planning.run()
+    # supply_planning logs itself
 
     log.info("\n[Engine 4] Recipe Explosion")
     ingredient_demand = recipe_explosion.run()
+    log_pipeline_run("recipe_explosion", started_at, "SUCCESS", len(ingredient_demand) if ingredient_demand is not None else 0)
 
     log.info("\n[Engine 5] Warehouse Planning")
     warehouse_shortage = warehouse_planning.run(ingredient_demand=ingredient_demand)
+    log_pipeline_run("warehouse_planning", started_at, "SUCCESS", len(warehouse_shortage) if warehouse_shortage is not None else 0)
 
     log.info("\n[Engine 6] Procurement Engine")
     procurement_recs = procurement_engine.run()
+    log_pipeline_run("procurement_engine", started_at, "SUCCESS", len(procurement_recs) if procurement_recs is not None else 0)
 
     log.info("\n[Engine 7] Alert Engine")
     new_alerts = alert_engine.run()
+    log_pipeline_run("alert_engine", started_at, "SUCCESS", len(new_alerts) if new_alerts is not None else 0)
 
     # ── SUMMARY ───────────────────────────────────────────────────────────────
     elapsed = (datetime.now(IST) - started_at).total_seconds()

@@ -18,7 +18,12 @@ async def get_supply_plan(
         "super_admin", "planning_manager", "demand_planner", "kitchen_ops"
     )),
 ):
-    today    = date.today()
+    max_date_df = query_df("SELECT max(forecast_date) as max_date FROM fact_forecast")
+    if not max_date_df.empty and max_date_df["max_date"].iloc[0] is not None:
+        today = __import__("pandas").to_datetime(max_date_df["max_date"].iloc[0]).date()
+    else:
+        today = date.today()
+        
     in_3d    = today + timedelta(days=3)
 
     # 3-day ingredient demand per kitchen
