@@ -110,15 +110,15 @@ async def update_thresholds(
 @router.get("/admin/pipeline-status")
 async def get_pipeline_status(user: UserContext = Depends(require_role("super_admin"))):
     df = query_df("""
-        SELECT job_name,
-               max(started_at)   AS last_run,
-               max(completed_at) AS last_completed,
-               argMax(status, started_at) AS status,
-               argMax(rows_processed, started_at) AS rows_processed,
-               argMax(error_message, started_at) AS error_message
+        SELECT DISTINCT ON (job_name)
+               job_name,
+               started_at AS last_run,
+               completed_at AS last_completed,
+               status,
+               rows_processed,
+               error_message
         FROM pipeline_runs
-        GROUP BY job_name
-        ORDER BY last_run DESC
+        ORDER BY job_name, started_at DESC
     """)
     return df.to_dict(orient="records") if not df.empty else []
 

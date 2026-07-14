@@ -20,9 +20,9 @@ async def get_accuracy_report(
     # Simplified: pull from pipeline_runs and compute weekly avg
     df = query_df(f"""
         SELECT
-            toStartOfWeek(started_at) AS week,
-            count() AS runs,
-            countIf(status = 'SUCCESS') AS success_runs
+            date_trunc('week', started_at) AS week,
+            count(*) AS runs,
+            count(*) FILTER (WHERE status = 'SUCCESS') AS success_runs
         FROM pipeline_runs
         WHERE job_name = 'forecast_engine' AND started_at >= '{start}'
         GROUP BY week ORDER BY week
@@ -45,8 +45,8 @@ async def get_stockout_report(
     start = date.today() - timedelta(days=days)
     df = query_df(f"""
         SELECT
-            toStartOfWeek(created_at) AS week,
-            count() AS incidents
+            date_trunc('week', created_at) AS week,
+            count(*) AS incidents
         FROM alerts
         WHERE alert_type = 'KITCHEN_STOCKOUT' AND created_at >= '{start}'
         GROUP BY week ORDER BY week
@@ -91,9 +91,9 @@ async def get_vendor_performance(
     df = query_df("""
         SELECT
             p.vendor,
-            count() AS total_orders,
-            countIf(g.received_date <= p.expected_date) AS on_time,
-            round(countIf(g.received_date <= p.expected_date) / count() * 100, 1) AS on_time_pct
+            count(*) AS total_orders,
+            count(*) FILTER (WHERE g.received_date <= p.expected_date) AS on_time,
+            round(count(*) FILTER (WHERE g.received_date <= p.expected_date)::numeric / nullif(count(*), 0) * 100, 1) AS on_time_pct
         FROM fact_open_pos p
         LEFT JOIN fact_grn_log g ON p.po_number = g.po_number
         WHERE g.grn_number != ''
