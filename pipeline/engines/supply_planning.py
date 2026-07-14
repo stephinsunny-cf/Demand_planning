@@ -51,8 +51,8 @@ def run() -> pd.DataFrame:
         stock_df = query_df(
             "SELECT kitchen, ingredient AS sku, qty_available AS stock_qty, unit "
             "FROM fact_kitchen_stock "
-            "WHERE (kitchen, ingredient, snapshot_time) IN ("
-            "  SELECT kitchen, ingredient, max(snapshot_time) "
+            "WHERE (kitchen, ingredient, snapshot_date) IN ("
+            "  SELECT kitchen, ingredient, max(snapshot_date) "
             "  FROM fact_kitchen_stock "
             "  GROUP BY kitchen, ingredient"
             ")"

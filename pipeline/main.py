@@ -137,7 +137,7 @@ def run_full_pipeline(use_dummy: bool = False):
     supply_plan = supply_planning.run()
 
     log.info("\n[Engine 4] Recipe Explosion")
-    ingredient_demand = recipe_explosion.run(supply_plan=supply_plan)
+    ingredient_demand = recipe_explosion.run()
 
     log.info("\n[Engine 5] Warehouse Planning")
     warehouse_shortage = warehouse_planning.run(ingredient_demand=ingredient_demand)

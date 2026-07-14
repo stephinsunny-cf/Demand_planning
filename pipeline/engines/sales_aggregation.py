@@ -57,6 +57,10 @@ def run(orders_df: pd.DataFrame = None, items_df: pd.DataFrame = None) -> pd.Dat
         if "status" in orders_df.columns:
             orders_df = orders_df[orders_df["status"].str.lower().isin(completed)]
 
+        # Drop created_at from items_df to avoid suffixing issues during merge
+        if "created_at" in items_df.columns:
+            items_df = items_df.drop(columns=["created_at"])
+            
         # Join items to orders to get brand, outlet, city, date
         merged = items_df.merge(
             orders_df[["order_id", "created_at", "store_name", "brand", "city"]],
@@ -87,10 +91,12 @@ def run(orders_df: pd.DataFrame = None, items_df: pd.DataFrame = None) -> pd.Dat
         )
         merged["outlet"] = merged["store_name"].astype(str).str.strip()
 
-        # Aggregate
+        # Aggregate strictly to PostgreSQL PK grain
         agg = (
-            merged.groupby(["date", "sku", "brand", "outlet", "city"], as_index=False)
+            merged.groupby(["date", "sku", "outlet"], as_index=False)
             .agg(
+                brand       =("brand", "first"),
+                city        =("city", "first"),
                 qty_sold    =("quantity", "sum"),
                 revenue     =("revenue", "sum"),
                 order_count =("order_id", "nunique"),
