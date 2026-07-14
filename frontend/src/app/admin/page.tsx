@@ -188,6 +188,8 @@ export default function AdminPage() {
 function UserManagement() {
   const [users, setUsers] = useState<Record<string, any>[]>([])
   const [updatingId, setUpdatingId] = useState<string | null>(null)
+  const [inviteEmail, setInviteEmail] = useState('')
+  const [inviting, setInviting] = useState(false)
 
   const fetchUsers = () => {
     api.get('/api/admin/users').then(r => setUsers(r.data)).catch(() => {})
@@ -206,11 +208,37 @@ function UserManagement() {
 
   return (
     <div className="card p-6 rounded-2xl">
-      <div className="flex items-center gap-3 mb-6">
-        <div className="p-2.5 rounded-xl bg-sky-500/10 border border-sky-500/20">
-          <Users size={18} className="text-sky-400" />
+      <div className="flex items-center justify-between mb-6">
+        <div className="flex items-center gap-3">
+          <div className="p-2.5 rounded-xl bg-sky-500/10 border border-sky-500/20">
+            <Users size={18} className="text-sky-400" />
+          </div>
+          <h2 className="text-base font-semibold text-slate-900 dark:text-white">Users ({users.length})</h2>
         </div>
-        <h2 className="text-base font-semibold text-slate-900 dark:text-white">Users ({users.length})</h2>
+        
+        <div className="flex items-center gap-2">
+          <input
+            type="email"
+            placeholder="Invite email..."
+            value={inviteEmail}
+            onChange={(e) => setInviteEmail(e.target.value)}
+            className="w-48 px-3 py-1.5 text-sm rounded-lg bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white focus:outline-none focus:border-sky-500"
+          />
+          <button
+            onClick={async () => {
+              if (!inviteEmail) return
+              setInviting(true)
+              await api.post('/api/admin/users', { email: inviteEmail, role: 'viewer' }).catch(console.error)
+              setInviteEmail('')
+              fetchUsers()
+              setInviting(false)
+            }}
+            disabled={inviting || !inviteEmail}
+            className="px-3 py-1.5 text-sm font-medium rounded-lg bg-sky-500 hover:bg-sky-400 text-white disabled:opacity-50 transition-colors"
+          >
+            {inviting ? 'Sending...' : 'Invite'}
+          </button>
+        </div>
       </div>
       <div className="grid gap-2">
         {users.map((u, i) => (
