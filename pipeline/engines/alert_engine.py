@@ -147,7 +147,7 @@ def run() -> list:
         try:
             four_weeks_ago = today - timedelta(days=28)
             avg_sales = query_df(f"""
-                SELECT sku, outlet, avg(qty) AS avg_daily
+                SELECT sku, outlet, avg(qty_sold) AS avg_daily
                 FROM fact_daily_sales
                 WHERE date >= '{four_weeks_ago}' GROUP BY sku, outlet
             """)
