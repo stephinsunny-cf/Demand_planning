@@ -1,0 +1,40 @@
+name: Daily Pipeline — 2:00 AM IST
+
+on:
+  schedule:
+    # 2:00 AM IST = 20:30 UTC (previous day)
+    - cron: '30 20 * * *'
+  workflow_dispatch:  # Allow manual trigger from GitHub UI
+
+jobs:
+  trigger-pipeline:
+    name: Trigger Demand Planning Pipeline
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Trigger pipeline on Render backend
+        run: |
+          echo "Triggering pipeline at $(date -u '+%Y-%m-%d %H:%M:%S') UTC (2:00 AM IST)"
+          
+          RESPONSE=$(curl -s -o /tmp/response.txt -w "%{http_code}" \
+            -X POST "${{ secrets.BACKEND_URL }}/api/admin/pipeline/trigger" \
+            -H "Authorization: Bearer ${{ secrets.PIPELINE_TOKEN }}" \
+            -H "Content-Type: application/json" \
+            --max-time 30)
+          
+          echo "HTTP Status: $RESPONSE"
+          echo "Response body:"
+          cat /tmp/response.txt
+          
+          if [ "$RESPONSE" -ge 200 ] && [ "$RESPONSE" -lt 300 ]; then
+            echo "✅ Pipeline triggered successfully"
+          else
+            echo "❌ Pipeline trigger failed with status $RESPONSE"
+            exit 1
+          fi
+
+      - name: Wait for pipeline to complete
+        run: |
+          echo "Waiting 3 minutes for pipeline to process data..."
+          sleep 180
+          echo "✅ Done waiting. Pipeline should be complete."

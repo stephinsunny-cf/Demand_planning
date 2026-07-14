@@ -21,6 +21,7 @@ interface Recipe {
 export default function RecipesPage() {
   const [rows,      setRows]     = useState<Recipe[]>([])
   const [loading,   setLoading]  = useState(true)
+  const [refreshing, setRefreshing] = useState(false)
   const [search,    setSearch]   = useState('')
   const [brand,     setBrand]    = useState('')
   const [trackedOnly, setTrackedOnly] = useState(false)
@@ -29,13 +30,17 @@ export default function RecipesPage() {
   const [brands,    setBrands]   = useState<string[]>([])
   const { canEdit } = useRole()
 
-  const fetchData = async () => {
-    setLoading(true)
+  const fetchData = async (silent = false) => {
+    if (silent) setRefreshing(true)
+    else setLoading(true)
     const params = new URLSearchParams({ ...(brand && { brand }), ...(search && { dish_name: search }) })
-    const r = await api.get(`/api/recipes?${params}`).catch(() => ({ data: [] }))
-    setRows(r.data)
-    setBrands([...new Set((r.data as Recipe[]).map(d => d.brand).filter(Boolean))].sort())
+    const r = await api.get(`/api/recipes?${params}`).catch(() => null)
+    if (r) {
+      setRows(r.data)
+      setBrands([...new Set((r.data as Recipe[]).map(d => d.brand).filter(Boolean))].sort())
+    }
     setLoading(false)
+    setRefreshing(false)
   }
 
   useEffect(() => { fetchData() }, [])
