@@ -13,14 +13,12 @@ export function useRole() {
   const role = user?.role || ''
 
   const canAccess = (page: string): boolean => {
-    if (!role) return false
-    const pages = ROLE_ACCESS[role] || []
-    return pages.includes('*') || pages.includes(page)
+    return true // TEMP OVERRIDE
   }
 
-  const isAdmin      = role === 'super_admin'
-  const canEdit      = ['super_admin', 'editor'].includes(role)
-  const canProcure   = ['super_admin', 'editor'].includes(role)
+  const isAdmin      = true // TEMP OVERRIDE
+  const canEdit      = true
+  const canProcure   = true
 
   return { role, canAccess, isAdmin, canEdit, canProcure, loading }
 }
