@@ -183,9 +183,8 @@ def run() -> pd.DataFrame:
     try:
         # Find the maximum date in the dataset to simulate "today"
         max_date_df = query_df("""
-            SELECT MAX(f.date) as max_date 
-            FROM fact_daily_sales f
-            JOIN procurement_tracker pt ON f.sku = pt.ingredient
+            SELECT MAX(date) as max_date 
+            FROM fact_daily_sales
         """)
         if max_date_df.empty or pd.isnull(max_date_df.iloc[0]["max_date"]):
             print("No sales data found in database.")
@@ -195,10 +194,9 @@ def run() -> pd.DataFrame:
 
         # Load historical sales (limit to last 40 days of available data)
         sales_df = query_df(f"""
-            SELECT f.date, f.sku, f.outlet, f.qty_sold 
-            FROM fact_daily_sales f
-            JOIN procurement_tracker pt ON f.sku = pt.ingredient
-            WHERE f.date >= DATE '{max_date}' - INTERVAL '40 days'
+            SELECT date, sku, outlet, qty_sold 
+            FROM fact_daily_sales
+            WHERE date >= DATE '{max_date}' - INTERVAL '40 days'
         """)
 
         if sales_df.empty:
