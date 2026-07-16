@@ -16,7 +16,7 @@ async def get_dashboard_summary(user: UserContext = Depends(get_current_user)):
     today = date.today()
 
     # Today's orders (uses the most recent date in the DB to simulate 'today's' batch data)
-    orders_df = query_df("SELECT sum(order_count) AS cnt FROM fact_daily_sales WHERE date = (SELECT MAX(date) FROM fact_daily_sales)")
+    orders_df = query_df("SELECT sum(qty_sold) AS cnt FROM fact_daily_sales WHERE date = (SELECT MAX(date) FROM fact_daily_sales)")
     total_orders_today = int(orders_df["cnt"].iloc[0]) if not orders_df.empty and pd.notna(orders_df["cnt"].iloc[0]) else 0
 
     # Alerts counts
