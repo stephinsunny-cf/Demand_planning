@@ -122,7 +122,7 @@ async def get_dashboard_summary(user: UserContext = Depends(get_current_user)):
                SUM(CASE WHEN expected_date < CURRENT_DATE AND status != 'Delivered' THEN 1 ELSE 0 END) as overdue_pos
         FROM fact_open_pos
         GROUP BY vendor
-        HAVING COUNT(*) > 0
+        HAVING COUNT(*) >= 5
         ORDER BY (SUM(CASE WHEN expected_date < CURRENT_DATE AND status != 'Delivered' THEN 1.0 ELSE 0.0 END) / COUNT(*)) DESC, total_pos DESC
         LIMIT 3
     """
