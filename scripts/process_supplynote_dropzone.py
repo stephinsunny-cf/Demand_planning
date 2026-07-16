@@ -10,7 +10,12 @@ logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)-8s] %(
 log = logging.getLogger("process_dropzone")
 
 def run():
-    dropzone_dir = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 'supplynote_dropzone')
+    # DROPZONE_DIR env var is set by the GitHub Actions workflow.
+    # Falls back to a sibling folder for local development.
+    dropzone_dir = os.getenv(
+        'DROPZONE_DIR',
+        os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 'supplynote_dropzone')
+    )
     csv_files = glob.glob(os.path.join(dropzone_dir, "*.csv"))
     
     # 1. Verify File Count and Size
@@ -163,34 +168,39 @@ def run():
             );
         """)
         
+        from psycopg2.extras import execute_values
+        
         log.info("Upserting dim_ingredients...")
-        for sku, data in dim_ingredients.items():
-            cursor.execute("""
+        ing_data = [(sku, d['name'], d['category'], str(d['isPackaged']), d['unit']) for sku, d in dim_ingredients.items()]
+        if ing_data:
+            execute_values(cursor, """
                 INSERT INTO dim_ingredients (sku, name, category, is_packaged, measuring_unit) 
-                VALUES (%s, %s, %s, %s, %s)
+                VALUES %s
                 ON CONFLICT (sku) DO UPDATE SET 
                     name = EXCLUDED.name, category = EXCLUDED.category, 
                     is_packaged = EXCLUDED.is_packaged, measuring_unit = EXCLUDED.measuring_unit
-            """, (sku, data['name'], data['category'], str(data['isPackaged']), data['unit']))
+            """, ing_data)
             
         log.info("Upserting dim_outlets...")
-        for outlet, data in dim_outlets.items():
-            cursor.execute("""
-                INSERT INTO dim_outlets (outlet, name, city) VALUES (%s, %s, %s)
+        out_data = [(outlet, d['name'], d['city']) for outlet, d in dim_outlets.items()]
+        if out_data:
+            execute_values(cursor, """
+                INSERT INTO dim_outlets (outlet, name, city) VALUES %s
                 ON CONFLICT (outlet) DO UPDATE SET 
                     name = EXCLUDED.name, city = EXCLUDED.city
-            """, (outlet, data['name'], data['city']))
+            """, out_data)
             
         log.info("Upserting kitchen_ingredient_mapping...")
-        for outlet, sku in kitchen_ingredient_mapping:
-            cursor.execute("""
-                INSERT INTO kitchen_ingredient_mapping (outlet, sku) VALUES (%s, %s)
+        map_data = list(kitchen_ingredient_mapping)
+        if map_data:
+            execute_values(cursor, """
+                INSERT INTO kitchen_ingredient_mapping (outlet, sku) VALUES %s
                 ON CONFLICT (outlet, sku) DO NOTHING
-            """, (outlet, sku))
+            """, map_data)
             
         if all_facts:
             master_df = pd.concat(all_facts, ignore_index=True)
-            # Grouping by date, sku, outlet as safety net (take first oos/avail, sum qty_sold)
+            # Grouping by date, sku, outlet as safety net
             agg_funcs = {'qty_sold': 'sum'}
             if 'currently_available' in master_df.columns: agg_funcs['currently_available'] = 'first'
             if 'oos' in master_df.columns: agg_funcs['oos'] = 'first'
@@ -198,26 +208,25 @@ def run():
             master_df = master_df.groupby(["date", "sku", "outlet"], as_index=False).agg(agg_funcs)
             
             log.info(f"Upserting {len(master_df)} facts into fact_daily_sales...")
-            inserted = 0
+            fact_data = []
             for _, row in master_df.iterrows():
-                try:
-                    date_str = row["date"].strftime("%Y-%m-%d")
-                    avail = row.get("currently_available", 0.0)
-                    oos = row.get("oos", None)
-                    if pd.isna(oos): oos = None
-                    
-                    cursor.execute("""
-                        INSERT INTO fact_daily_sales (date, sku, outlet, qty_sold, currently_available, oos)
-                        VALUES (%s, %s, %s, %s, %s, %s)
-                        ON CONFLICT (date, sku, outlet) DO UPDATE SET 
-                            qty_sold = EXCLUDED.qty_sold,
-                            currently_available = EXCLUDED.currently_available,
-                            oos = EXCLUDED.oos
-                    """, (date_str, row["sku"], row["outlet"], row["qty_sold"], avail, oos))
-                    inserted += 1
-                except Exception as e:
-                    log.warning(f"Fact insert failed: {e}")
-            log.info(f"Upserted {inserted} facts successfully.")
+                if pd.isna(row["date"]): continue
+                date_str = row["date"].strftime("%Y-%m-%d")
+                avail = row.get("currently_available", 0.0)
+                oos = row.get("oos", None)
+                if pd.isna(oos): oos = None
+                fact_data.append((date_str, row["sku"], row["outlet"], row["qty_sold"], avail, oos))
+                
+            if fact_data:
+                execute_values(cursor, """
+                    INSERT INTO fact_daily_sales (date, sku, outlet, qty_sold, currently_available, oos)
+                    VALUES %s
+                    ON CONFLICT (date, sku, outlet) DO UPDATE SET 
+                        qty_sold = EXCLUDED.qty_sold,
+                        currently_available = EXCLUDED.currently_available,
+                        oos = EXCLUDED.oos
+                """, fact_data, page_size=10000)
+            log.info(f"Upserted {len(fact_data)} facts successfully.")
 
         conn.commit()
         cursor.close()

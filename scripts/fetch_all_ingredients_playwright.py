@@ -8,12 +8,18 @@ from playwright.sync_api import sync_playwright, TimeoutError as PWTimeout
 logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s")
 log = logging.getLogger("playwright_downloader")
 
-load_dotenv(r'd:\demand-planning\.env')
+# Load .env if it exists (local dev). On GitHub Actions, env vars are injected directly.
+load_dotenv()
 SN_USERNAME = os.getenv('SUPPLYNOTE_USER')
 SN_PASSWORD = os.getenv('SUPPLYNOTE_PASSWORD')
 BUSINESS_ID = "65b205675255c93a41dd7849"
-DROPZONE = r"d:\demand-planning\supplynote_dropzone"
 
+# DROPZONE_DIR env var is set in the GitHub Actions workflow.
+# Falls back to a local path for development.
+DROPZONE = os.getenv(
+    'DROPZONE_DIR',
+    os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 'supplynote_dropzone')
+)
 os.makedirs(DROPZONE, exist_ok=True)
 
 import argparse

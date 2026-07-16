@@ -28,8 +28,9 @@ jobs:
         env:
           SUPPLYNOTE_USER: ${{ secrets.SUPPLYNOTE_USER }}
           SUPPLYNOTE_PASSWORD: ${{ secrets.SUPPLYNOTE_PASSWORD }}
+          DROPZONE_DIR: ${{ github.workspace }}/supplynote_dropzone
         run: |
-          # The script checks the .env file if it exists, but will fall back to environment variables.
+          mkdir -p ${{ github.workspace }}/supplynote_dropzone
           python scripts/fetch_all_ingredients_playwright.py --yesterday
 
       - name: Process and Upload to PostgreSQL
@@ -39,5 +40,6 @@ jobs:
           PG_PASS: ${{ secrets.PG_PASS }}
           PG_DB: ${{ secrets.PG_DB }}
           PG_PORT: ${{ secrets.PG_PORT }}
+          DROPZONE_DIR: ${{ github.workspace }}/supplynote_dropzone
         run: |
           python scripts/process_supplynote_dropzone.py
