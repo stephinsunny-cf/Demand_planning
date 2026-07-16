@@ -1,12 +1,12 @@
 name: Daily SupplyNote Sync
 
 on:
-  workflow_dispatch: # Allows manual trigger from cron-job.org or GitHub UI
+  workflow_dispatch: # Triggered by cron-job.org or manually from GitHub UI
 
 jobs:
   sync_supplynote_data:
     runs-on: ubuntu-latest
-    
+
     steps:
       - name: Checkout Code
         uses: actions/checkout@v4
@@ -20,26 +20,17 @@ jobs:
       - name: Install Dependencies
         run: |
           python -m pip install --upgrade pip
-          pip install -r requirements.txt
-          pip install playwright pandas psycopg2-binary
-          playwright install chromium
+          pip install playwright pandas psycopg2-binary requests python-dotenv
+          playwright install chromium --with-deps
 
-      - name: Run Playwright Downloader (Yesterday Only)
+      - name: Download, Clean & Upload to PostgreSQL (In-Memory)
         env:
-          SUPPLYNOTE_USER: ${{ secrets.SUPPLYNOTE_USER }}
+          SUPPLYNOTE_USER:     ${{ secrets.SUPPLYNOTE_USER }}
           SUPPLYNOTE_PASSWORD: ${{ secrets.SUPPLYNOTE_PASSWORD }}
-          DROPZONE_DIR: ${{ github.workspace }}/supplynote_dropzone
+          PG_HOST:             ${{ secrets.PG_HOST }}
+          PG_USER:             ${{ secrets.PG_USER }}
+          PG_PASS:             ${{ secrets.PG_PASS }}
+          PG_DB:               ${{ secrets.PG_DB }}
+          PG_PORT:             ${{ secrets.PG_PORT }}
         run: |
-          mkdir -p ${{ github.workspace }}/supplynote_dropzone
-          python scripts/fetch_all_ingredients_playwright.py --yesterday
-
-      - name: Process and Upload to PostgreSQL
-        env:
-          PG_HOST: ${{ secrets.PG_HOST }}
-          PG_USER: ${{ secrets.PG_USER }}
-          PG_PASS: ${{ secrets.PG_PASS }}
-          PG_DB: ${{ secrets.PG_DB }}
-          PG_PORT: ${{ secrets.PG_PORT }}
-          DROPZONE_DIR: ${{ github.workspace }}/supplynote_dropzone
-        run: |
-          python scripts/process_supplynote_dropzone.py
+          python scripts/sync_supplynote_daily.py
