@@ -79,6 +79,12 @@ def ensure_tables(cursor):
             PRIMARY KEY (date, sku, outlet)
         );
     """)
+    # Ensure new columns exist even if the table was created before they were added
+    cursor.execute("""
+        ALTER TABLE fact_daily_sales
+            ADD COLUMN IF NOT EXISTS currently_available NUMERIC,
+            ADD COLUMN IF NOT EXISTS oos VARCHAR;
+    """)
 
 
 # ── Data cleaning ─────────────────────────────────────────────────────────────
