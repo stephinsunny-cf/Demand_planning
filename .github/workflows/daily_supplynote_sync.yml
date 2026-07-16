@@ -1,7 +1,9 @@
 name: Daily SupplyNote Sync
 
 on:
-  workflow_dispatch: # Triggered by cron-job.org or manually from GitHub UI
+  schedule:
+    - cron: '30 20 * * *' # 2:00 AM IST (20:30 UTC)
+  workflow_dispatch: # Allows manual trigger
 
 jobs:
   sync_supplynote_data:
