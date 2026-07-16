@@ -6,7 +6,7 @@ import KPICard from '@/components/KPICard'
 import AlertBadge from '@/components/AlertBadge'
 import LoadingSpinner from '@/components/LoadingSpinner'
 import api from '@/lib/api'
-import { ShoppingCart, Bell, AlertTriangle, Target, Clock, CheckCircle2 } from 'lucide-react'
+import { ShoppingCart, Bell, AlertTriangle, Target, Clock, CheckCircle2, TrendingUp, Package, Truck, AlertCircle } from 'lucide-react'
 import { formatDistanceToNow } from 'date-fns'
 
 interface DashboardData {
@@ -14,9 +14,15 @@ interface DashboardData {
   active_alerts_count:       number
   critical_alerts_count:     number
   skus_at_risk:              number
+  revenue_at_risk:           number
   forecast_accuracy_percent: number
   last_data_refresh:         string | null
   recent_alerts:             Alert[]
+  pending_pos:               number
+  overdue_pos:               number
+  top_movers:                { sku: string; total_qty: number }[]
+  warehouse_sufficiency_pct: number
+  vendor_performance:        { vendor: string; total_pos: number; overdue_pos: number }[]
 }
 
 interface Alert {
@@ -61,12 +67,11 @@ export default function DashboardPage() {
           {/* KPI Cards */}
           <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
             <KPICard
-              title="Orders Today"
-              value={data?.total_orders_today?.toLocaleString() ?? '—'}
-              subtitle="Completed & delivered"
-              icon={<ShoppingCart size={18} />}
-              color="emerald"
-              trend={5}
+              title="Open PO Tracker"
+              value={data?.pending_pos ?? 0}
+              subtitle={data?.overdue_pos ? `${data.overdue_pos} POs overdue` : 'No overdue POs'}
+              icon={<Truck size={18} />}
+              color={data?.overdue_pos ? 'rose' : 'emerald'}
             />
             <KPICard
               title="Active Alerts"
@@ -76,11 +81,11 @@ export default function DashboardPage() {
               color={data?.critical_alerts_count ? 'rose' : 'amber'}
             />
             <KPICard
-              title="SKUs at Risk"
-              value={data?.skus_at_risk ?? 0}
-              subtitle="May stock out in 3 days"
+              title="Revenue at Risk"
+              value={`₹${(data?.revenue_at_risk ?? 0).toLocaleString(undefined, {maximumFractionDigits: 0})}`}
+              subtitle={`${data?.skus_at_risk ?? 0} SKUs may stock out`}
               icon={<AlertTriangle size={18} />}
-              color="amber"
+              color="rose"
             />
             <KPICard
               title="Forecast Accuracy"
@@ -90,6 +95,88 @@ export default function DashboardPage() {
               color="violet"
               trend={2}
             />
+          </div>
+
+          {/* Operational Pulse Row */}
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            {/* Top Moving SKUs */}
+            <div className="card rounded-2xl p-6 flex flex-col">
+              <h2 className="text-base font-semibold text-slate-900 dark:text-white flex items-center gap-2 mb-4">
+                <TrendingUp size={18} className="text-emerald-500" />
+                Top Moving SKUs
+              </h2>
+              <div className="space-y-3 flex-1">
+                {data?.top_movers?.length ? (
+                  data.top_movers.map((mover, i) => (
+                    <div key={mover.sku} className="flex items-center justify-between p-2 hover:bg-slate-50 dark:hover:bg-slate-800/50 rounded-lg transition-colors">
+                      <div className="flex items-center gap-3">
+                        <span className="text-xs font-bold text-slate-400 w-4">{i + 1}.</span>
+                        <span className="text-sm font-medium text-slate-700 dark:text-slate-300 font-mono">{mover.sku}</span>
+                      </div>
+                      <span className="text-sm font-semibold text-slate-900 dark:text-white">
+                        {mover.total_qty.toLocaleString()}
+                      </span>
+                    </div>
+                  ))
+                ) : (
+                  <p className="text-sm text-slate-500 text-center py-4">No sales data in last 48h</p>
+                )}
+              </div>
+            </div>
+
+            {/* Warehouse Transfer Status */}
+            <div className="card rounded-2xl p-6 flex flex-col justify-center">
+              <h2 className="text-base font-semibold text-slate-900 dark:text-white flex items-center gap-2 mb-2">
+                <Package size={18} className="text-indigo-500" />
+                Warehouse Sufficiency
+              </h2>
+              <p className="text-xs text-slate-500 mb-6">Shortages resolved via internal transfer</p>
+              
+              <div className="relative pt-1">
+                <div className="flex mb-2 items-center justify-between">
+                  <div>
+                    <span className="text-xs font-semibold inline-block py-1 px-2 uppercase rounded-full text-indigo-600 bg-indigo-200">
+                      Internal Cover
+                    </span>
+                  </div>
+                  <div className="text-right">
+                    <span className="text-xs font-semibold inline-block text-indigo-600">
+                      {(data?.warehouse_sufficiency_pct ?? 0).toFixed(1)}%
+                    </span>
+                  </div>
+                </div>
+                <div className="overflow-hidden h-2 mb-4 text-xs flex rounded bg-indigo-100">
+                  <div style={{ width: `${Math.min(100, data?.warehouse_sufficiency_pct ?? 0)}%` }} className="shadow-none flex flex-col text-center whitespace-nowrap text-white justify-center bg-indigo-500"></div>
+                </div>
+              </div>
+            </div>
+
+            {/* Vendor Performance */}
+            <div className="card rounded-2xl p-6 flex flex-col">
+              <h2 className="text-base font-semibold text-slate-900 dark:text-white flex items-center gap-2 mb-4">
+                <AlertCircle size={18} className="text-rose-500" />
+                Vendor Delays
+              </h2>
+              <div className="space-y-3 flex-1">
+                {data?.vendor_performance?.length ? (
+                  data.vendor_performance.map((vp) => (
+                    <div key={vp.vendor} className="flex flex-col p-2 hover:bg-slate-50 dark:hover:bg-slate-800/50 rounded-lg transition-colors">
+                      <div className="flex items-center justify-between mb-1">
+                        <span className="text-sm font-medium text-slate-700 dark:text-slate-300 truncate pr-2">{vp.vendor}</span>
+                        <span className="text-xs font-bold text-rose-500 bg-rose-50 dark:bg-rose-500/10 px-2 py-0.5 rounded">
+                          {vp.overdue_pos} overdue
+                        </span>
+                      </div>
+                      <span className="text-xs text-slate-500">
+                        {vp.total_pos} total open POs
+                      </span>
+                    </div>
+                  ))
+                ) : (
+                  <p className="text-sm text-slate-500 text-center py-4">No vendor delays tracked</p>
+                )}
+              </div>
+            </div>
           </div>
 
           {/* Alert Feed */}

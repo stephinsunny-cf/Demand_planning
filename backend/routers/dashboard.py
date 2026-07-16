@@ -71,12 +71,76 @@ async def get_dashboard_summary(user: UserContext = Depends(get_current_user)):
     )
     recent_alerts = recent_df.to_dict(orient="records") if not recent_df.empty else []
 
+    # 1. Financial Impact (Revenue at Risk) - 3x multiplier on COGS
+    revenue_sql = """
+        SELECT sum(p.estimated_cost) * 3 AS rev_at_risk 
+        FROM fact_procurement p
+        WHERE p.urgency IN ('URGENT', 'WARNING') 
+    """
+    revenue_df = query_df(revenue_sql)
+    revenue_at_risk = float(revenue_df["rev_at_risk"].iloc[0]) if not revenue_df.empty and pd.notna(revenue_df["rev_at_risk"].iloc[0]) else 0.0
+
+    # 2. Open PO Tracker
+    po_sql = """
+        SELECT 
+            SUM(CASE WHEN status != 'Delivered' THEN 1 ELSE 0 END) as pending_pos,
+            SUM(CASE WHEN status != 'Delivered' AND expected_date < CURRENT_DATE THEN 1 ELSE 0 END) as overdue_pos
+        FROM fact_open_pos
+    """
+    po_df = query_df(po_sql)
+    pending_pos = int(po_df["pending_pos"].iloc[0]) if not po_df.empty and pd.notna(po_df["pending_pos"].iloc[0]) else 0
+    overdue_pos = int(po_df["overdue_pos"].iloc[0]) if not po_df.empty and pd.notna(po_df["overdue_pos"].iloc[0]) else 0
+
+    # 3. Top Moving SKUs (Last 2 days)
+    movers_sql = """
+        SELECT sku, SUM(qty_sold) as total_qty
+        FROM fact_daily_sales
+        WHERE date >= (SELECT MAX(date) FROM fact_daily_sales) - INTERVAL '2 days'
+        GROUP BY sku
+        ORDER BY total_qty DESC
+        LIMIT 5
+    """
+    movers_df = query_df(movers_sql)
+    top_movers = movers_df.to_dict(orient="records") if not movers_df.empty else []
+
+    # 4. Warehouse Transfer Status
+    wh_sql = """
+        SELECT 
+            SUM(total_demand) as network_demand,
+            SUM(LEAST(total_demand, warehouse_stock)) as internal_transfers
+        FROM fact_procurement
+    """
+    wh_df = query_df(wh_sql)
+    network_demand = float(wh_df["network_demand"].iloc[0]) if not wh_df.empty and pd.notna(wh_df["network_demand"].iloc[0]) else 0.0
+    internal_transfers = float(wh_df["internal_transfers"].iloc[0]) if not wh_df.empty and pd.notna(wh_df["internal_transfers"].iloc[0]) else 0.0
+    warehouse_sufficiency_pct = (internal_transfers / network_demand * 100) if network_demand > 0 else 0.0
+
+    # 5. Vendor Performance Tracking
+    vendor_sql = """
+        SELECT vendor, 
+               COUNT(*) as total_pos, 
+               SUM(CASE WHEN expected_date < CURRENT_DATE AND status != 'Delivered' THEN 1 ELSE 0 END) as overdue_pos
+        FROM fact_open_pos
+        GROUP BY vendor
+        HAVING COUNT(*) > 0
+        ORDER BY overdue_pos DESC, total_pos DESC
+        LIMIT 3
+    """
+    vendor_df = query_df(vendor_sql)
+    vendor_performance = vendor_df.to_dict(orient="records") if not vendor_df.empty else []
+
     return {
         "total_orders_today":        total_orders_today,
         "active_alerts_count":       active_alerts,
         "critical_alerts_count":     critical_alerts,
         "skus_at_risk":              skus_at_risk,
+        "revenue_at_risk":           revenue_at_risk,
         "forecast_accuracy_percent": accuracy,
         "last_data_refresh":         last_refresh,
         "recent_alerts":             recent_alerts,
+        "pending_pos":               pending_pos,
+        "overdue_pos":               overdue_pos,
+        "top_movers":                top_movers,
+        "warehouse_sufficiency_pct": warehouse_sufficiency_pct,
+        "vendor_performance":        vendor_performance,
     }
