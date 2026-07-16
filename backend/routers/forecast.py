@@ -47,7 +47,7 @@ async def get_forecast(
     fore_df = query_df(f"""
         SELECT f.forecast_date, sum(f.qty_predicted) as qty_predicted, sum(f.qty_lower) as qty_lower, sum(f.qty_upper) as qty_upper, max(f.model_run_date) as model_run_date
         FROM fact_forecast f
-        LEFT JOIN procurement_tracker t ON f.sku = t.ingredient
+        LEFT JOIN procurement_tracker t ON f.sku = t.code
         WHERE f.sku IN ({sku_in}) AND f.outlet IN ({outlet_in})
           AND f.forecast_date >= '{latest - timedelta(days=7)}' AND f.forecast_date <= '{latest}'
         GROUP BY f.forecast_date
@@ -72,7 +72,7 @@ from functools import lru_cache
 
 @lru_cache(maxsize=1)
 def get_cached_outlet_city_mapping():
-    df = query_df("SELECT city, array_agg(DISTINCT outlet) as outlets FROM fact_daily_sales GROUP BY city")
+    df = query_df("SELECT city, array_agg(DISTINCT outlet) as outlets FROM dim_outlets GROUP BY city")
     filters = []
     mapping = {}
     for _, row in df.iterrows():
@@ -135,12 +135,12 @@ async def get_forecast_all(
     df = query_df(f"""
         WITH forecast_agg AS (
             SELECT 
-                f.ingredient,
+                f.sku,
                 f.outlet,
-                SUM(f.total_qty_needed) as agg_qty
-            FROM fact_ingredient_demand f
+                SUM(f.qty_predicted) as agg_qty
+            FROM fact_forecast f
             WHERE {where_sql}
-            GROUP BY f.ingredient, f.outlet
+            GROUP BY f.sku, f.outlet
         )
         SELECT 
             pt.ingredient AS sku,
@@ -148,7 +148,7 @@ async def get_forecast_all(
             COALESCE(fa.agg_qty, 0) AS total_predicted,
             pt.code AS sku_code
         FROM procurement_tracker pt
-        LEFT JOIN forecast_agg fa ON pt.ingredient = fa.ingredient
+        LEFT JOIN forecast_agg fa ON pt.code = fa.sku
         ORDER BY total_predicted DESC
         LIMIT 5000
     """)
