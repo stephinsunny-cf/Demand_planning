@@ -71,9 +71,9 @@ async def get_dashboard_summary(user: UserContext = Depends(get_current_user)):
     )
     recent_alerts = recent_df.to_dict(orient="records") if not recent_df.empty else []
 
-    # 1. Financial Impact (Revenue at Risk) - 3x multiplier on COGS
+    # 1. Financial Impact (Revenue at Risk) - 33% Food Cost Assumption
     revenue_sql = """
-        SELECT sum(p.estimated_cost) * 3 AS rev_at_risk 
+        SELECT sum(p.estimated_cost) / 0.33 AS rev_at_risk 
         FROM fact_procurement p
         WHERE p.urgency IN ('URGENT', 'WARNING') 
     """
@@ -122,6 +122,7 @@ async def get_dashboard_summary(user: UserContext = Depends(get_current_user)):
                SUM(CASE WHEN expected_date < CURRENT_DATE AND status != 'Delivered' THEN 1 ELSE 0 END) as overdue_pos
         FROM fact_open_pos
         GROUP BY vendor
+        -- Filter out low-volume vendors to avoid heavily skewed % rates
         HAVING COUNT(*) >= 5
         ORDER BY (SUM(CASE WHEN expected_date < CURRENT_DATE AND status != 'Delivered' THEN 1.0 ELSE 0.0 END) / COUNT(*)) DESC, total_pos DESC
         LIMIT 3
