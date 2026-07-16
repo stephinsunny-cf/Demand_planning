@@ -32,7 +32,7 @@ from backend.database import query_df, get_db_connection
 log = logging.getLogger(__name__)
 IST = timezone(timedelta(hours=5, minutes=30))
 
-MIN_HISTORY_DAYS = 30
+MIN_HISTORY_DAYS = 1
 FORECAST_HORIZON = 30
 
 

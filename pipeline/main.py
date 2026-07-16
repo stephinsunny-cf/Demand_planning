@@ -16,6 +16,7 @@ import os
 import sys
 import logging
 import argparse
+import pandas as pd
 from datetime import datetime, timezone, timedelta
 from pathlib import Path
 
@@ -118,14 +119,49 @@ def run_full_pipeline(use_dummy: bool = False, skip_extract: bool = False):
     # Bypassed Engine 4: Recipe Explosion (we forecast ingredients directly now!)
     # Convert forecast directly into ingredient demand for warehouse planning
     if forecasts is not None and not forecasts.empty:
-        ingredient_demand = forecasts.groupby("sku", as_index=False)["qty_predicted"].sum()
+        # Group by both sku AND forecast_date
+        ingredient_demand = forecasts.groupby(["forecast_date", "sku"], as_index=False)["qty_predicted"].sum()
         ingredient_demand = ingredient_demand.rename(columns={"sku": "ingredient", "qty_predicted": "total_qty_needed"})
         ingredient_demand["unit"] = "unit" # Dummy unit, can be mapped if needed
+        ingredient_demand["outlet"] = "ALL"
+        
+        # Save to database so Procurement and Alert engines can use it
+        from backend.database import get_db_connection
+        import psycopg2
+        from psycopg2.extras import execute_values
+        with get_db_connection() as conn:
+            with conn.cursor() as cur:
+                cur.execute('''
+                    CREATE TABLE IF NOT EXISTS fact_ingredient_demand (
+                        forecast_date DATE,
+                        outlet VARCHAR(255),
+                        ingredient VARCHAR(255),
+                        unit VARCHAR(50),
+                        total_qty_needed FLOAT
+                    )
+                ''')
+                cur.execute("TRUNCATE TABLE fact_ingredient_demand")
+                insert_query = '''
+                    INSERT INTO fact_ingredient_demand (forecast_date, outlet, ingredient, unit, total_qty_needed)
+                    VALUES %s
+                '''
+                values = [
+                    (row['forecast_date'], row['outlet'], row['ingredient'], row['unit'], row['total_qty_needed'])
+                    for _, row in ingredient_demand.iterrows()
+                ]
+                execute_values(cur, insert_query, values)
+                conn.commit()
+                log.info(f"Saved {len(values)} rows to fact_ingredient_demand")
+                
+        # For warehouse planning, we just need the aggregated sum per ingredient across all dates
+        ingredient_demand_agg = ingredient_demand.groupby("ingredient", as_index=False)["total_qty_needed"].sum()
+        ingredient_demand_agg["unit"] = "unit"
     else:
-        ingredient_demand = pd.DataFrame(columns=["ingredient", "total_qty_needed", "unit"])
+        ingredient_demand_agg = pd.DataFrame(columns=["ingredient", "total_qty_needed", "unit"])
+
 
     log.info("\n[Engine 5] Warehouse Planning")
-    warehouse_shortage = warehouse_planning.run(ingredient_demand=ingredient_demand)
+    warehouse_shortage = warehouse_planning.run(ingredient_demand=ingredient_demand_agg)
     log_pipeline_run("warehouse_planning", started_at, "SUCCESS", len(warehouse_shortage) if warehouse_shortage is not None else 0)
 
     log.info("\n[Engine 6] Procurement Engine")
@@ -144,7 +180,7 @@ def run_full_pipeline(use_dummy: bool = False, skip_extract: bool = False):
     log.info("Sales rows:          %d", 0) # Obsolete UrbanPiper engine removed
     log.info("Forecast rows:       %d", len(forecasts) if forecasts is not None else 0)
     log.info("Supply plan rows:    %d", len(supply_plan) if supply_plan is not None else 0)
-    log.info("Ingredient demands:  %d", len(ingredient_demand) if ingredient_demand is not None else 0)
+    log.info("Ingredient demands:  %d", len(ingredient_demand_agg) if ingredient_demand is not None else 0)
     log.info("Shortage items:      %d", len(warehouse_shortage) if warehouse_shortage is not None else 0)
     log.info("Procurement recs:    %d", len(procurement_recs) if procurement_recs is not None else 0)
     log.info("New alerts:          %d", len(new_alerts))

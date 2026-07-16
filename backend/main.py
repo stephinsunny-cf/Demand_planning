@@ -37,7 +37,6 @@ from backend.routers import (
     reports,
     admin,
     tracker,
-    cron,
 )
 
 logging.basicConfig(
@@ -75,7 +74,6 @@ app.include_router(alerts.router,      prefix="/api", tags=["Alerts"])
 app.include_router(reports.router,     prefix="/api", tags=["Reports"])
 app.include_router(tracker.router,     prefix="/api", tags=["Tracker"])
 app.include_router(admin.router,       prefix="/api", tags=["Admin"])
-app.include_router(cron.router,        prefix="/api/cron", tags=["Cron Automation"])
 
 
 # ── Health check ──────────────────────────────────────────────────────────────

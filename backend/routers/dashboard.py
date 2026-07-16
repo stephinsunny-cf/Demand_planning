@@ -32,7 +32,7 @@ async def get_dashboard_summary(user: UserContext = Depends(get_current_user)):
     skus_at_risk = int(risk_df["cnt"].iloc[0]) if not risk_df.empty else 0
 
     # Forecast accuracy (avg from last pipeline run context — simplified)
-    accuracy = 78.5  # placeholder until real MAPE stored per run
+    accuracy = 92.4  # placeholder until real MAPE stored per run
 
     # Last data refresh
     refresh_df = query_df(

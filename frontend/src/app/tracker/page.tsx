@@ -89,7 +89,7 @@ export default function TrackerPage() {
     { key: 'code', label: 'Item Code', sortable: true },
     { key: 'ingredient', label: 'Ingredient / SKU', sortable: true },
     { key: 'supply_mode', label: 'Supply Mode', sortable: true },
-    { key: 'lead_time_days', label: 'Lead Time (Days)', sortable: true, render: (v: unknown, r: any) => <EditableLeadTimeCell val={v} row={r} /> },
+    { key: 'lead_time_days', label: 'Safety Stock (Days)', sortable: true, render: (v: unknown, r: any) => <EditableLeadTimeCell val={v} row={r} /> },
     { key: 'drr', label: 'DRR', sortable: true, render: (v: unknown) => Number(v).toFixed(2) },
     { key: 'wh_sih', label: 'WH SIH', sortable: true, render: (v: unknown) => Number(v).toFixed(2) },
     { key: 'open_po', label: 'Open PO', sortable: true, render: (v: unknown) => Number(v).toFixed(2) },
@@ -146,7 +146,7 @@ export default function TrackerPage() {
                   </select>
                 </div>
                 <div className="col-span-1">
-                  <label className="block text-xs font-semibold text-slate-500 mb-1">Lead Time (Days)</label>
+                  <label className="block text-xs font-semibold text-slate-500 mb-1">Safety Stock (Days)</label>
                   <input type="number" step="0.1" value={newItem.lead_time_days} onChange={e => setNewItem({...newItem, lead_time_days: Number(e.target.value)})} className="w-full px-3 py-2 bg-slate-100 dark:bg-slate-800 border-none rounded-lg text-sm focus:ring-2 focus:ring-emerald-500" />
                 </div>
               </div>
