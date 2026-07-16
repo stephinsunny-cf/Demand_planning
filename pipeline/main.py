@@ -44,16 +44,14 @@ log = logging.getLogger("pipeline.main")
 
 
 # ── Import pipeline modules ───────────────────────────────────────────────────
-from pipeline.extractors   import urbanpiper, supplynote
+from pipeline.extractors   import supplynote
 from pipeline.transformers import clean
 from pipeline.transformers import uom_converter
 from pipeline.loaders import postgres as loader
 from pipeline.loaders.postgres import log_pipeline_run
 from pipeline.engines      import (
-    sales_aggregation,
     forecast_engine,
     supply_planning,
-    recipe_explosion,
     warehouse_planning,
     procurement_engine,
     alert_engine,
@@ -75,24 +73,11 @@ def run_full_pipeline(use_dummy: bool = False, skip_extract: bool = False):
         # ── STEP 1: EXTRACT ───────────────────────────────────────────────────────
         log.info("\n── STEP 1: EXTRACT ──────────────────────────────────────")
 
-        log.info("Extracting from UrbanPiper...")
-        up_data = urbanpiper.extract_all(use_dummy=use_dummy)
-
         log.info("Extracting from SupplyNote...")
         sn_data = supplynote.extract_all(use_dummy=use_dummy)
 
         # ── STEP 2: TRANSFORM / CLEAN ─────────────────────────────────────────────
         log.info("\n── STEP 2: CLEAN & TRANSFORM ────────────────────────────")
-
-        orders_clean = clean.clean_orders(up_data.get("orders"))
-        items_clean  = clean.clean_order_items(up_data.get("order_items"))
-        menu_clean   = clean.clean_menu_items(up_data.get("menu_items"))
-        recipe_clean = clean.clean_recipe_master(up_data.get("recipe_master"))
-
-        # Convert UOM on recipe master
-        recipe_clean = uom_converter.convert_df_uom(
-            recipe_clean, qty_col="qty_per_portion", unit_col="unit", ingredient_col="ingredient"
-        )
 
         kitchen_stock   = clean.clean_kitchen_stock(sn_data.get("kitchen_stock"))
         warehouse_stock = clean.clean_warehouse_stock(sn_data.get("warehouse_stock"))
@@ -106,20 +91,11 @@ def run_full_pipeline(use_dummy: bool = False, skip_extract: bool = False):
                 uom_converter.convert_df_uom(df, "qty_available", "unit",
                                               ingredient_col="ingredient" if "ingredient" in df.columns else None)
 
-        # Cross-table validation
-        unmapped = clean.flag_unmapped_skus(items_clean, menu_clean)
-        if unmapped:
-            log.warning("Found %d unmapped SKUs — check menu_items", len(unmapped))
-
         # ── STEP 3: LOAD ──────────────────────────────────────────────────────────
         log.info("\n── STEP 3: LOAD INTO CLICKHOUSE ─────────────────────────")
 
         client = loader.get_local_client()
 
-        loader.insert_df(orders_clean,    "fact_orders_raw",    client=client)
-        loader.insert_df(items_clean,     "fact_order_items_raw", client=client)
-        loader.insert_df(menu_clean,      "dim_menu_items",     client=client)
-        loader.insert_df(recipe_clean,    "dim_recipe_master",  client=client)
         loader.insert_df(kitchen_stock,   "fact_kitchen_stock", client=client)
         loader.insert_df(warehouse_stock, "fact_warehouse_stock", client=client)
         loader.insert_df(open_pos,        "fact_open_pos",      client=client)
@@ -131,12 +107,6 @@ def run_full_pipeline(use_dummy: bool = False, skip_extract: bool = False):
     # ── STEP 4 → 10: RUN PLANNING ENGINES ───────────────────────────────────
     log.info("\n── STEP 4-10: RUN PLANNING ENGINES ──────────────────────")
 
-    log.info("\n[Engine 1] Sales Aggregation")
-    if skip_extract:
-        daily_sales = sales_aggregation.run(orders_df=None, items_df=None)
-    else:
-        daily_sales = sales_aggregation.run(orders_df=orders_clean, items_df=items_clean)
-
     log.info("\n[Engine 2] Forecast Engine (Prophet)")
     forecasts = forecast_engine.run()
     log_pipeline_run("forecast_engine", started_at, "SUCCESS", len(forecasts) if forecasts is not None else 0)
@@ -145,9 +115,14 @@ def run_full_pipeline(use_dummy: bool = False, skip_extract: bool = False):
     supply_plan = supply_planning.run()
     # supply_planning logs itself
 
-    log.info("\n[Engine 4] Recipe Explosion")
-    ingredient_demand = recipe_explosion.run()
-    log_pipeline_run("recipe_explosion", started_at, "SUCCESS", len(ingredient_demand) if ingredient_demand is not None else 0)
+    # Bypassed Engine 4: Recipe Explosion (we forecast ingredients directly now!)
+    # Convert forecast directly into ingredient demand for warehouse planning
+    if forecasts is not None and not forecasts.empty:
+        ingredient_demand = forecasts.groupby("sku", as_index=False)["qty_predicted"].sum()
+        ingredient_demand = ingredient_demand.rename(columns={"sku": "ingredient", "qty_predicted": "total_qty_needed"})
+        ingredient_demand["unit"] = "unit" # Dummy unit, can be mapped if needed
+    else:
+        ingredient_demand = pd.DataFrame(columns=["ingredient", "total_qty_needed", "unit"])
 
     log.info("\n[Engine 5] Warehouse Planning")
     warehouse_shortage = warehouse_planning.run(ingredient_demand=ingredient_demand)
@@ -166,7 +141,7 @@ def run_full_pipeline(use_dummy: bool = False, skip_extract: bool = False):
     log.info("\n╔══════════════════════════════════════════════════════╗")
     log.info("║   PIPELINE COMPLETE — %.1fs                           ", elapsed)
     log.info("╚══════════════════════════════════════════════════════╝")
-    log.info("Sales rows:          %d", len(daily_sales) if daily_sales is not None else 0)
+    log.info("Sales rows:          %d", 0) # Obsolete UrbanPiper engine removed
     log.info("Forecast rows:       %d", len(forecasts) if forecasts is not None else 0)
     log.info("Supply plan rows:    %d", len(supply_plan) if supply_plan is not None else 0)
     log.info("Ingredient demands:  %d", len(ingredient_demand) if ingredient_demand is not None else 0)
@@ -175,7 +150,6 @@ def run_full_pipeline(use_dummy: bool = False, skip_extract: bool = False):
     log.info("New alerts:          %d", len(new_alerts))
 
     return {
-        "daily_sales":        daily_sales,
         "forecasts":          forecasts,
         "supply_plan":        supply_plan,
         "ingredient_demand":  ingredient_demand,
