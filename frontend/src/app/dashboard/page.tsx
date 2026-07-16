@@ -22,7 +22,7 @@ interface DashboardData {
   overdue_pos:               number
   top_movers:                { sku: string; total_qty: number }[]
   warehouse_sufficiency_pct: number
-  vendor_performance:        { vendor: string; total_pos: number; overdue_pos: number }[]
+  vendor_performance:        { vendor: string; total_pos: number; overdue_pos: number; delay_rate_pct: number }[]
 }
 
 interface Alert {
@@ -65,7 +65,15 @@ export default function DashboardPage() {
         <div className="space-y-6">
 
           {/* KPI Cards */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-5 gap-4">
+            <KPICard
+              title="Orders Today"
+              value={data?.total_orders_today?.toLocaleString() ?? '—'}
+              subtitle="Completed & delivered"
+              icon={<ShoppingCart size={18} />}
+              color="emerald"
+              trend={5}
+            />
             <KPICard
               title="Open PO Tracker"
               value={data?.pending_pos ?? 0}
@@ -83,7 +91,7 @@ export default function DashboardPage() {
             <KPICard
               title="Revenue at Risk"
               value={`₹${(data?.revenue_at_risk ?? 0).toLocaleString(undefined, {maximumFractionDigits: 0})}`}
-              subtitle={`${data?.skus_at_risk ?? 0} SKUs may stock out`}
+              subtitle="Estimated (Assuming 33% Food Cost)"
               icon={<AlertTriangle size={18} />}
               color="rose"
             />
@@ -164,11 +172,11 @@ export default function DashboardPage() {
                       <div className="flex items-center justify-between mb-1">
                         <span className="text-sm font-medium text-slate-700 dark:text-slate-300 truncate pr-2">{vp.vendor}</span>
                         <span className="text-xs font-bold text-rose-500 bg-rose-50 dark:bg-rose-500/10 px-2 py-0.5 rounded">
-                          {vp.overdue_pos} overdue
+                          {vp.delay_rate_pct.toFixed(0)}% delay rate
                         </span>
                       </div>
                       <span className="text-xs text-slate-500">
-                        {vp.total_pos} total open POs
+                        {vp.overdue_pos} overdue out of {vp.total_pos} open POs
                       </span>
                     </div>
                   ))

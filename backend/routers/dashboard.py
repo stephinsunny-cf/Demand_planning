@@ -106,14 +106,14 @@ async def get_dashboard_summary(user: UserContext = Depends(get_current_user)):
     # 4. Warehouse Transfer Status
     wh_sql = """
         SELECT 
-            SUM(total_demand) as network_demand,
+            SUM(total_demand) as total_shortfall,
             SUM(LEAST(total_demand, warehouse_stock)) as internal_transfers
         FROM fact_procurement
     """
     wh_df = query_df(wh_sql)
-    network_demand = float(wh_df["network_demand"].iloc[0]) if not wh_df.empty and pd.notna(wh_df["network_demand"].iloc[0]) else 0.0
+    total_shortfall = float(wh_df["total_shortfall"].iloc[0]) if not wh_df.empty and pd.notna(wh_df["total_shortfall"].iloc[0]) else 0.0
     internal_transfers = float(wh_df["internal_transfers"].iloc[0]) if not wh_df.empty and pd.notna(wh_df["internal_transfers"].iloc[0]) else 0.0
-    warehouse_sufficiency_pct = (internal_transfers / network_demand * 100) if network_demand > 0 else 0.0
+    warehouse_sufficiency_pct = (internal_transfers / total_shortfall * 100) if total_shortfall > 0 else 0.0
 
     # 5. Vendor Performance Tracking
     vendor_sql = """
@@ -123,10 +123,13 @@ async def get_dashboard_summary(user: UserContext = Depends(get_current_user)):
         FROM fact_open_pos
         GROUP BY vendor
         HAVING COUNT(*) > 0
-        ORDER BY overdue_pos DESC, total_pos DESC
+        ORDER BY (SUM(CASE WHEN expected_date < CURRENT_DATE AND status != 'Delivered' THEN 1.0 ELSE 0.0 END) / COUNT(*)) DESC, total_pos DESC
         LIMIT 3
     """
     vendor_df = query_df(vendor_sql)
+    # Add delay_rate_pct
+    if not vendor_df.empty:
+        vendor_df["delay_rate_pct"] = (vendor_df["overdue_pos"] / vendor_df["total_pos"]) * 100
     vendor_performance = vendor_df.to_dict(orient="records") if not vendor_df.empty else []
 
     return {
