@@ -83,8 +83,8 @@ def insert_df(df: pd.DataFrame, table: str, client=None) -> int:
             # Convert NaN to None for SQL NULL
             df_insert = df_insert.where(pd.notnull(df_insert), None)
 
-            # Truncate old data, then bulk insert fresh data
-            cur.execute(f"TRUNCATE TABLE {table}")
+            # Append fresh data (without truncating, so we don't wipe out user uploads)
+            # To avoid duplicating full history, in production you'd use UPSERT or partition by date.
 
             rows = [tuple(row) for row in df_insert.itertuples(index=False, name=None)]
             cols_sql = ", ".join(f'"{c}"' for c in valid_cols)

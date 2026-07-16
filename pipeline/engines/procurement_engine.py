@@ -106,7 +106,6 @@ def run() -> pd.DataFrame:
 
         # Calculate average daily demand for safety stock
         recs["avg_daily"] = recs["total_demand"] / 7.0
-        recs["safety_buffer"] = recs["avg_daily"] * SAFETY_BUFFER_DAYS
 
         # Merge Open POs
         if not pos_df.empty:
@@ -119,15 +118,18 @@ def run() -> pd.DataFrame:
         if not vendor_df.empty:
             recs = recs.merge(vendor_df, on="ingredient", how="left", suffixes=("", "_vendor"))
         else:
-            recs["lead_time_days"] = 3
+            recs["lead_time_days"] = 7
             recs["moq"] = 1.0
             recs["price"] = 0.0
             recs["vendor_name"] = "Unknown Vendor"
 
-        recs["lead_time_days"] = pd.to_numeric(recs.get("lead_time_days", 3), errors="coerce").fillna(3).astype(int)
+        recs["lead_time_days"] = pd.to_numeric(recs.get("lead_time_days", 7), errors="coerce").fillna(7).astype(int)
         recs["moq"]            = pd.to_numeric(recs.get("moq", 1.0), errors="coerce").fillna(1.0)
         recs["price"]          = pd.to_numeric(recs.get("price", 0.0), errors="coerce").fillna(0.0)
         recs["vendor_name"]    = recs.get("vendor_name", "Unknown Vendor").fillna("Unknown Vendor")
+
+        # Now calculate safety buffer dynamically using lead_time_days from procurement_tracker
+        recs["safety_buffer"] = recs["avg_daily"] * recs["lead_time_days"]
 
         # Procurement Qty = (Net Req + Safety Stock) - Open PO Qty
         recs["raw_recommended_qty"] = (recs["net_requirement"] + recs["safety_buffer"]) - recs["po_qty"]

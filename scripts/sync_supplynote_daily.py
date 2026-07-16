@@ -69,6 +69,14 @@ def ensure_tables(cursor):
             sku    VARCHAR,
             PRIMARY KEY (outlet, sku)
         );
+        CREATE TABLE IF NOT EXISTS fact_kitchen_stock (
+            snapshot_date DATE,
+            kitchen VARCHAR,
+            ingredient VARCHAR,
+            qty_available NUMERIC,
+            unit VARCHAR,
+            PRIMARY KEY (snapshot_date, kitchen, ingredient)
+        );
         CREATE TABLE IF NOT EXISTS fact_daily_sales (
             date               DATE,
             sku                VARCHAR,
@@ -235,6 +243,94 @@ def upsert_to_db(df_facts, dim_ingredients, dim_outlets, mapping):
         conn.close()
 
 
+
+def sync_stock_via_playwright(page):
+    log.info("Fetching current stock for all outlets via direct API (this may take 1-2 minutes)...")
+    
+    # Increase the timeout for this specific page.evaluate call by letting JS run asynchronously
+    stock_data = page.evaluate('''async () => {
+        try {
+            let outletsRes = await fetch('/api/outlets', {headers: {'Accept': 'application/json'}});
+            let outletsJson = await outletsRes.json();
+            let outlets = outletsJson.data || outletsJson || [];
+            
+            let allStock = [];
+            // Fetch in batches of 5 to speed it up without overwhelming the server
+            for (let i = 0; i < outlets.length; i += 5) {
+                let batch = outlets.slice(i, i + 5);
+                let promises = batch.map(async (out) => {
+                    try {
+                        let res = await fetch('/api/outletproducts/outlet/' + out._id + '?capex=false&parentProducts=false');
+                        if (!res.ok) return [];
+                        let items = await res.json();
+                        let parsed = [];
+                        for (let item of items) {
+                            if (!item.product) continue;
+                            let stock = item.currentStock !== undefined ? item.currentStock : (item.stock !== undefined ? item.stock : (item.physicalStock || 0));
+                            parsed.push({
+                                outlet: out.outletName || out._id,
+                                sku: item.product.skuProductCode || item.product._id,
+                                qty_available: parseFloat(stock) || 0.0,
+                                unit: item.product.baseUnit || 'piece'
+                            });
+                        }
+                        return parsed;
+                    } catch(e) { return []; }
+                });
+                
+                let results = await Promise.all(promises);
+                for (let res of results) {
+                    allStock = allStock.concat(res);
+                }
+            }
+            return allStock;
+        } catch(e) {
+            return { error: e.message };
+        }
+    }''')
+    
+    if isinstance(stock_data, dict) and "error" in stock_data:
+        log.error(f"Failed to fetch stock: {stock_data['error']}")
+        return []
+        
+    log.info(f"Fetched stock for {len(stock_data)} outlet-ingredient combinations.")
+    return stock_data
+
+def upsert_stock_to_db(stock_list):
+    if not stock_list: return
+    
+    conn = get_conn()
+    conn.autocommit = False
+    cursor = conn.cursor()
+    
+    try:
+        ensure_tables(cursor)
+        
+        today = datetime.now().strftime("%Y-%m-%d")
+        fact_data = [
+            (today, s['outlet'], s['sku'], s['qty_available'], s['unit'])
+            for s in stock_list
+        ]
+        
+        if fact_data:
+            execute_values(cursor, """
+                INSERT INTO fact_kitchen_stock (snapshot_date, kitchen, ingredient, qty_available, unit)
+                VALUES %s
+                ON CONFLICT (snapshot_date, kitchen, ingredient) DO UPDATE SET
+                    qty_available = EXCLUDED.qty_available,
+                    unit = EXCLUDED.unit
+            """, fact_data, page_size=10000)
+            log.info(f"Upserted {len(fact_data)} rows into fact_kitchen_stock.")
+            
+        conn.commit()
+    except Exception as e:
+        conn.rollback()
+        log.error(f"Stock DB error: {e}")
+        raise
+    finally:
+        cursor.close()
+        conn.close()
+
 # ── Main orchestrator ─────────────────────────────────────────────────────────
 def run():
     import argparse
@@ -277,6 +373,11 @@ def run():
             except PWTimeout:
                 log.error("Login failed. Check SUPPLYNOTE_USER / SUPPLYNOTE_PASSWORD secrets.")
                 sys.exit(1)
+
+            # ── 1.5. Download Current Stock ─────────────────────────────────────
+            stock_list = sync_stock_via_playwright(page)
+            if stock_list:
+                upsert_stock_to_db(stock_list)
 
             # ── Get version key ───────────────────────────────────────────────
             versions = page.evaluate(f"""async () => {{
