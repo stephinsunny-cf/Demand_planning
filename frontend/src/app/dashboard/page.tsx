@@ -91,7 +91,7 @@ export default function DashboardPage() {
             <KPICard
               title="Revenue at Risk"
               value={`₹${(data?.revenue_at_risk ?? 0).toLocaleString(undefined, {maximumFractionDigits: 0})}`}
-              subtitle="Estimated (Assuming 33% Food Cost)"
+              subtitle={`${data?.skus_at_risk ?? 0} SKUs (Est. @ 33% Food Cost)`}
               icon={<AlertTriangle size={18} />}
               color="rose"
             />
