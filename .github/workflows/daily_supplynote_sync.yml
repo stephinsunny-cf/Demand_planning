@@ -37,6 +37,26 @@ jobs:
         run: |
           python scripts/sync_supplynote_daily.py
 
+      - name: Run Playwright Downloader for All Ingredients (Yesterday Only)
+        env:
+          SUPPLYNOTE_USER:     ${{ secrets.SUPPLYNOTE_USER }}
+          SUPPLYNOTE_PASSWORD: ${{ secrets.SUPPLYNOTE_PASSWORD }}
+          DROPZONE_DIR:        ${{ github.workspace }}/supplynote_dropzone
+        run: |
+          mkdir -p ${{ github.workspace }}/supplynote_dropzone
+          python scripts/fetch_all_ingredients_playwright.py --yesterday
+
+      - name: Process Ingredients and Upload to PostgreSQL
+        env:
+          PG_HOST:             ${{ secrets.PG_HOST }}
+          PG_USER:             ${{ secrets.PG_USER }}
+          PG_PASS:             ${{ secrets.PG_PASS }}
+          PG_DB:               ${{ secrets.PG_DB }}
+          PG_PORT:             ${{ secrets.PG_PORT }}
+          DROPZONE_DIR:        ${{ github.workspace }}/supplynote_dropzone
+        run: |
+          python scripts/process_supplynote_dropzone.py
+
       - name: Run Overnight ML Calculations (Forecast & Procurement)
         env:
           PG_HOST:             ${{ secrets.PG_HOST }}
