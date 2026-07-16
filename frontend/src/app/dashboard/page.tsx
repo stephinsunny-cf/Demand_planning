@@ -18,7 +18,7 @@ interface DashboardData {
   forecast_accuracy_percent: number
   last_data_refresh:         string | null
   recent_alerts:             Alert[]
-  pending_pos:               number
+  total_open_pos:            number
   overdue_pos:               number
   top_movers:                { sku: string; total_qty: number }[]
   warehouse_sufficiency_pct: number
@@ -75,8 +75,8 @@ export default function DashboardPage() {
               trend={5}
             />
             <KPICard
-              title="Open PO Tracker"
-              value={data?.pending_pos ?? 0}
+              title="Total Open POs"
+              value={data?.total_open_pos ?? 0}
               subtitle={data?.overdue_pos ? `${data.overdue_pos} POs overdue` : 'No overdue POs'}
               icon={<Truck size={18} />}
               color={data?.overdue_pos ? 'rose' : 'emerald'}
@@ -167,19 +167,26 @@ export default function DashboardPage() {
               </h2>
               <div className="space-y-3 flex-1">
                 {data?.vendor_performance?.length ? (
-                  data.vendor_performance.map((vp) => (
-                    <div key={vp.vendor} className="flex flex-col p-2 hover:bg-slate-50 dark:hover:bg-slate-800/50 rounded-lg transition-colors">
-                      <div className="flex items-center justify-between mb-1">
-                        <span className="text-sm font-medium text-slate-700 dark:text-slate-300 truncate pr-2">{vp.vendor}</span>
-                        <span className="text-xs font-bold text-rose-500 bg-rose-50 dark:bg-rose-500/10 px-2 py-0.5 rounded">
-                          {vp.delay_rate_pct.toFixed(0)}% delay rate
+                  <>
+                    {data.vendor_performance.map((vp) => (
+                      <div key={vp.vendor} className="flex flex-col p-2 hover:bg-slate-50 dark:hover:bg-slate-800/50 rounded-lg transition-colors">
+                        <div className="flex items-center justify-between mb-1">
+                          <span className="text-sm font-medium text-slate-700 dark:text-slate-300 truncate pr-2">{vp.vendor}</span>
+                          <span className="text-xs font-bold text-rose-500 bg-rose-50 dark:bg-rose-500/10 px-2 py-0.5 rounded">
+                            {vp.delay_rate_pct.toFixed(0)}% delay rate
+                          </span>
+                        </div>
+                        <span className="text-xs text-slate-500">
+                          {vp.overdue_pos} overdue out of {vp.total_pos} open POs
                         </span>
                       </div>
-                      <span className="text-xs text-slate-500">
-                        {vp.overdue_pos} overdue out of {vp.total_pos} open POs
-                      </span>
-                    </div>
-                  ))
+                    ))}
+                    {data.vendor_performance.length < 3 && (
+                      <p className="text-xs text-slate-400 text-center mt-4 pt-2 border-t border-slate-100 dark:border-slate-800">
+                        Other vendors do not meet volume criteria
+                      </p>
+                    )}
+                  </>
                 ) : (
                   <p className="text-sm text-slate-500 text-center py-4">No vendor delays tracked</p>
                 )}

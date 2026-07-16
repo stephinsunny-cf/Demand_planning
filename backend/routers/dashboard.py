@@ -83,12 +83,12 @@ async def get_dashboard_summary(user: UserContext = Depends(get_current_user)):
     # 2. Open PO Tracker
     po_sql = """
         SELECT 
-            SUM(CASE WHEN status != 'Delivered' THEN 1 ELSE 0 END) as pending_pos,
+            SUM(CASE WHEN status != 'Delivered' THEN 1 ELSE 0 END) as total_open_pos,
             SUM(CASE WHEN status != 'Delivered' AND expected_date < CURRENT_DATE THEN 1 ELSE 0 END) as overdue_pos
         FROM fact_open_pos
     """
     po_df = query_df(po_sql)
-    pending_pos = int(po_df["pending_pos"].iloc[0]) if not po_df.empty and pd.notna(po_df["pending_pos"].iloc[0]) else 0
+    total_open_pos = int(po_df["total_open_pos"].iloc[0]) if not po_df.empty and pd.notna(po_df["total_open_pos"].iloc[0]) else 0
     overdue_pos = int(po_df["overdue_pos"].iloc[0]) if not po_df.empty and pd.notna(po_df["overdue_pos"].iloc[0]) else 0
 
     # 3. Top Moving SKUs (Last 2 days)
@@ -113,7 +113,8 @@ async def get_dashboard_summary(user: UserContext = Depends(get_current_user)):
     wh_df = query_df(wh_sql)
     total_shortfall = float(wh_df["total_shortfall"].iloc[0]) if not wh_df.empty and pd.notna(wh_df["total_shortfall"].iloc[0]) else 0.0
     internal_transfers = float(wh_df["internal_transfers"].iloc[0]) if not wh_df.empty and pd.notna(wh_df["internal_transfers"].iloc[0]) else 0.0
-    warehouse_sufficiency_pct = (internal_transfers / total_shortfall * 100) if total_shortfall > 0 else 0.0
+    # If there is no shortfall today, the warehouse is 100% sufficient
+    warehouse_sufficiency_pct = (internal_transfers / total_shortfall * 100) if total_shortfall > 0 else 100.0
 
     # 5. Vendor Performance Tracking
     vendor_sql = """
@@ -142,7 +143,7 @@ async def get_dashboard_summary(user: UserContext = Depends(get_current_user)):
         "forecast_accuracy_percent": accuracy,
         "last_data_refresh":         last_refresh,
         "recent_alerts":             recent_alerts,
-        "pending_pos":               pending_pos,
+        "total_open_pos":            total_open_pos,
         "overdue_pos":               overdue_pos,
         "top_movers":                top_movers,
         "warehouse_sufficiency_pct": warehouse_sufficiency_pct,
