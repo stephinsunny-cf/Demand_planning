@@ -67,3 +67,15 @@ jobs:
         run: |
           # The --process-only flag skips any old legacy extractions and immediately runs the engines
           python pipeline/main.py --process-only
+
+      - name: Sync UrbanPiper POS Data (4 Tables via Metabase API)
+        env:
+          METABASE_URL:        https://clickhouse.eatfit.in
+          METABASE_API_KEY:    ${{ secrets.METABASE_API_KEY }}
+          PG_HOST:             ${{ secrets.PG_HOST }}
+          PG_USER:             ${{ secrets.PG_USER }}
+          PG_PASS:             ${{ secrets.PG_PASS }}
+          PG_DB:               ${{ secrets.PG_DB }}
+          PG_PORT:             ${{ secrets.PG_PORT }}
+        run: |
+          python scripts/sync_urbanpiper_daily.py
