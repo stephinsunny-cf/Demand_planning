@@ -18,10 +18,10 @@ export default function ReportsPage() {
   const [days, setDays] = useState(90)
 
   const swrOptions = { revalidateOnFocus: false, revalidateOnReconnect: false }
-  const { data: accuracy } = useSWR(`/api/reports/accuracy?days=${days}`, fetcher, swrOptions)
-  const { data: stockouts } = useSWR(`/api/reports/stockouts?days=${days}`, fetcher, swrOptions)
-  const { data: wastage } = useSWR(`/api/reports/wastage?days=${days}`, fetcher, swrOptions)
-  const { data: vendor } = useSWR('/api/reports/vendor', fetcher, swrOptions)
+  const { data: accuracy } = useSWR<any[]>(`/api/reports/accuracy?days=${days}`, fetcher, swrOptions)
+  const { data: stockouts } = useSWR<any[]>(`/api/reports/stockouts?days=${days}`, fetcher, swrOptions)
+  const { data: wastage } = useSWR<any[]>(`/api/reports/wastage?days=${days}`, fetcher, swrOptions)
+  const { data: vendor } = useSWR<any[]>('/api/reports/vendor', fetcher, swrOptions)
 
   const loading = !accuracy || !stockouts || !wastage || !vendor
 
