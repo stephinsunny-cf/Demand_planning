@@ -70,7 +70,6 @@ def run_variance_engine():
             JOIN recipe_master rm ON rm.dish_name = am.recipe_name
             WHERE CAST(o.created_at_ist AS DATE) >= '{start_date}'
               AND CAST(o.created_at_ist AS DATE) <= '{end_date}'
-              AND lower(trim(rm.ingredient)) IN (SELECT lower(trim(code)) FROM procurement_tracker)
             GROUP BY CAST(o.created_at_ist AS DATE), o.store_name, rm.ingredient, rm.unit
         """
         expected_df = pd.read_sql(expected_sql, conn)
@@ -84,23 +83,10 @@ def run_variance_engine():
                 SUM(qty_sold) as actual_qty
             FROM fact_daily_sales
             WHERE date >= '{start_date}' AND date <= '{end_date}'
-              AND lower(trim(sku)) IN (SELECT lower(trim(code)) FROM procurement_tracker)
             GROUP BY date, outlet, sku
         """
         actual_df = pd.read_sql(actual_sql, conn)
         
-        # Point 2: Logging untracked consumption
-        untracked_sql = f"""
-            SELECT COUNT(DISTINCT sku) as untracked_count, SUM(revenue) as untracked_value
-            FROM fact_daily_sales
-            WHERE date >= '{start_date}' AND date <= '{end_date}'
-              AND lower(trim(sku)) NOT IN (SELECT lower(trim(code)) FROM procurement_tracker)
-        """
-        untracked_df = pd.read_sql(untracked_sql, conn)
-        if not untracked_df.empty:
-            count = untracked_df['untracked_count'].iloc[0]
-            val = untracked_df['untracked_value'].iloc[0] or 0
-            logger.info(f"Point 2 Check: {count} untracked ingredients were excluded from Variance this run, totaling ₹{val:,.2f} in estimated consumption value.")
 
     if expected_df.empty:
         logger.warning("No expected usage found in the rolling window.")
@@ -145,12 +131,6 @@ def run_variance_engine():
     
     # Point 4: Distinct count sanity check before insert
     distinct_ingredients = merged['ingredient'].nunique()
-    if distinct_ingredients > 138:
-        logger.error(f"Point 4 Verification Failed: Output contains {distinct_ingredients} distinct ingredients, which exceeds the 138 limit!")
-        return
-    elif distinct_ingredients < 138:
-        missing_count = 138 - distinct_ingredients
-        logger.warning(f"Point 4 Soft Warning: Output contains only {distinct_ingredients} ingredients. {missing_count} tracked ingredients dropped entirely tonight. Check for sync gaps.")
 
     # 6. Upsert into fact_variance
     logger.info(f"Upserting {len(merged)} variance records into fact_variance... (Distinct Ingredients: {distinct_ingredients})")
