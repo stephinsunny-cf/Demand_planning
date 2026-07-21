@@ -53,7 +53,21 @@ export default function DashboardPage() {
 
   return (
     <Layout title="Dashboard">
-      {isLoading && !data ? (
+      {error ? (
+        <div className="flex flex-col items-center justify-center py-20 px-4 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-slate-500 dark:text-slate-400 shadow-sm">
+          <AlertTriangle size={40} className="mb-4 text-rose-500" />
+          <h2 className="text-lg font-semibold text-slate-900 dark:text-white mb-2">Couldn't load dashboard data</h2>
+          <p className="text-sm text-center max-w-md">
+            The server encountered an unexpected error while retrieving this data. Please try refreshing the page, or contact support if the issue persists.
+          </p>
+          <button 
+            onClick={() => window.location.reload()}
+            className="mt-6 px-4 py-2 bg-emerald-500 hover:bg-emerald-600 text-white rounded-lg text-sm font-medium transition-colors"
+          >
+            Refresh Page
+          </button>
+        </div>
+      ) : isLoading && !data ? (
         <LoadingSpinner />
       ) : (
         <div className="space-y-6">
