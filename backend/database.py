@@ -69,11 +69,6 @@ def get_db_connection():
     return _get_pool().getconn()
 
 def query_df(sql: str, params: tuple = None):
-    """Execute a SQL query and return a pandas DataFrame."""
     import pandas as pd
     with get_db() as conn:
-        try:
-            return pd.read_sql_query(sql, conn, params=params)
-        except Exception as exc:
-            log.error("DB query failed: %s\nSQL: %s", exc, sql[:300])
-            return pd.DataFrame()
+        return pd.read_sql_query(sql, conn, params=params)
