@@ -8,7 +8,7 @@ import DataTable from '@/components/DataTable'
 import ExportButton from '@/components/ExportButton'
 import LoadingSpinner from '@/components/LoadingSpinner'
 import api from '@/lib/api'
-import { IndianRupee, ShoppingBag, Layers, Activity } from 'lucide-react'
+import { IndianRupee, ShoppingBag, Layers, Activity, AlertTriangle } from 'lucide-react'
 
 export default function SalesPage() {
   const [tab, setTab] = useState<'pos' | 'consumption'>('pos')
