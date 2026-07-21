@@ -135,7 +135,7 @@ DDL_STATEMENTS = [
     """,
 
     """
-    CREATE TABLE IF NOT EXISTS dim_recipe_master (
+    CREATE TABLE IF NOT EXISTS recipe_master (
         dish_name       String,
         ingredient      String,
         qty_per_portion Float32,

@@ -98,11 +98,9 @@ def parse_recipes(recipes):
 
             rows.append({
                 "dish_name":       dish_name,
-                "sku_code":        sku_code,
-                "ingredient":      ingredient_name,
-                "qty_per_portion": round(qty_per_portion, 6),
+                "ingredient":      sku_code if sku_code else ingredient_name, # new schema uses code as ingredient
+                "qty_per_unit":    round(qty_per_portion, 6),
                 "unit":            unit,
-                "yield_factor":    yield_factor,
             })
 
     print(f"Parsed {len(rows)} ingredient rows from {len(recipes)} recipes")
@@ -110,21 +108,19 @@ def parse_recipes(recipes):
 
 
 def ensure_table(conn):
-    """Create dim_recipe_master table if it doesn't exist."""
+    """Create recipe_master table if it doesn't exist."""
     with conn.cursor() as cur:
         cur.execute("""
-            CREATE TABLE IF NOT EXISTS dim_recipe_master (
+            CREATE TABLE IF NOT EXISTS recipe_master (
                 dish_name       TEXT NOT NULL,
-                sku_code        TEXT,
                 ingredient      TEXT NOT NULL,
-                qty_per_portion FLOAT,
+                qty_per_unit    FLOAT,
                 unit            TEXT,
-                yield_factor    FLOAT DEFAULT 1.0,
                 PRIMARY KEY (dish_name, ingredient)
             );
         """)
     conn.commit()
-    print("Table dim_recipe_master ready.")
+    print("Table recipe_master ready.")
 
 
 def upsert_recipes(conn, rows):
@@ -137,23 +133,21 @@ def upsert_recipes(conn, rows):
     for row in rows:
         key = (row["dish_name"], row["ingredient"])
         unique[key] = row
-    values = [(r["dish_name"], r["sku_code"], r["ingredient"],
-               r["qty_per_portion"], r["unit"], r["yield_factor"])
+    values = [(r["dish_name"], r["ingredient"],
+               r["qty_per_unit"], r["unit"])
               for r in unique.values()]
 
     upsert_sql = """
-        INSERT INTO dim_recipe_master (dish_name, sku_code, ingredient, qty_per_portion, unit, yield_factor)
+        INSERT INTO recipe_master (dish_name, ingredient, qty_per_unit, unit)
         VALUES %s
         ON CONFLICT (dish_name, ingredient) DO UPDATE SET
-            sku_code        = EXCLUDED.sku_code,
-            qty_per_portion = EXCLUDED.qty_per_portion,
-            unit            = EXCLUDED.unit,
-            yield_factor    = EXCLUDED.yield_factor;
+            qty_per_unit = EXCLUDED.qty_per_unit,
+            unit         = EXCLUDED.unit;
     """
     with conn.cursor() as cur:
         execute_values(cur, upsert_sql, values)
     conn.commit()
-    print(f"Upserted {len(values)} recipe rows into dim_recipe_master!")
+    print(f"Upserted {len(values)} recipe rows into recipe_master!")
 
 
 def main():

@@ -22,8 +22,8 @@ async def get_warehouse(
     # Ingredient demand (from recipe master × forecast)
     demand_df = query_df("""
         SELECT r.ingredient, r.unit,
-               sum(r.qty_per_portion / r.yield_factor) AS demand_per_unit
-        FROM dim_recipe_master r
+               sum(r.qty_per_unit) AS demand_per_unit
+        FROM recipe_master r
         GROUP BY r.ingredient, r.unit
     """)
 
