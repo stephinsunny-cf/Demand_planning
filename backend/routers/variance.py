@@ -75,12 +75,16 @@ async def get_variance(
         ing_name = r['ingredient'].lower()
         thresh = settings.get(ing_name, fallback)
         
-        abs_var = abs(var_pct)
-        if abs_var <= thresh['green_threshold']:
-            r['flag'] = 'green'
-        elif abs_var <= thresh['yellow_threshold']:
-            r['flag'] = 'yellow'
+        if exp == 0 and act > 0:
+            r['flag'] = 'unmapped'
+            r['variance_pct'] = None
         else:
-            r['flag'] = 'red'
+            abs_var = abs(var_pct)
+            if abs_var <= thresh['green_threshold']:
+                r['flag'] = 'green'
+            elif abs_var <= thresh['yellow_threshold']:
+                r['flag'] = 'yellow'
+            else:
+                r['flag'] = 'red'
 
     return records
