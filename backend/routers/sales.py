@@ -48,7 +48,9 @@ async def get_sales_pos(
         ORDER BY date DESC
         LIMIT 5000
     """
+    import pandas as pd
     df = query_df(sql)
+    df = df.where(pd.notnull(df), None)
     return df.to_dict(orient="records") if not df.empty else []
 
 
@@ -97,9 +99,10 @@ async def get_sales_pos_summary(
         GROUP BY brand_name ORDER BY revenue DESC
     """)
 
-    total_rev = float(totals["total_revenue"].iloc[0]) if not totals.empty and not pd.isna(totals["total_revenue"].iloc[0]) else 0
-    total_ord = int(totals["total_orders"].iloc[0]) if not totals.empty else 0
-    unique_skus = int(unique_skus_df["unique_skus"].iloc[0]) if not unique_skus_df.empty else 0
+    import pandas as pd
+    total_rev = float(totals["total_revenue"].iloc[0]) if not totals.empty and pd.notna(totals["total_revenue"].iloc[0]) else 0
+    total_ord = int(totals["total_orders"].iloc[0]) if not totals.empty and pd.notna(totals["total_orders"].iloc[0]) else 0
+    unique_skus = int(unique_skus_df["unique_skus"].iloc[0]) if not unique_skus_df.empty and pd.notna(unique_skus_df["unique_skus"].iloc[0]) else 0
 
     return {
         "total_revenue":    round(total_rev, 2),
@@ -149,7 +152,9 @@ async def get_sales(
         ORDER BY date DESC
         LIMIT 5000
     """
+    import pandas as pd
     df = query_df(sql)
+    df = df.where(pd.notnull(df), None)
     return df.to_dict(orient="records") if not df.empty else []
 
 
@@ -191,9 +196,10 @@ async def get_sales_summary(
         GROUP BY brand ORDER BY revenue DESC
     """)
 
-    total_rev = float(totals["total_revenue"].iloc[0]) if not totals.empty else 0
-    total_ord = int(totals["total_orders"].iloc[0]) if not totals.empty else 0
-    unique_skus = int(totals["unique_skus"].iloc[0]) if not totals.empty else 0
+    import pandas as pd
+    total_rev = float(totals["total_revenue"].iloc[0]) if not totals.empty and pd.notna(totals["total_revenue"].iloc[0]) else 0
+    total_ord = int(totals["total_orders"].iloc[0]) if not totals.empty and pd.notna(totals["total_orders"].iloc[0]) else 0
+    unique_skus = int(totals["unique_skus"].iloc[0]) if not totals.empty and pd.notna(totals["unique_skus"].iloc[0]) else 0
 
     return {
         "total_revenue":    round(total_rev, 2),

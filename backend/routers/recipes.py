@@ -40,6 +40,8 @@ async def get_recipes(
         ORDER BY r.dish_name, r.ingredient
         LIMIT 2000
     """)
+    import pandas as pd
+    df = df.where(pd.notnull(df), None)
     return df.to_dict(orient="records") if not df.empty else []
 
 
