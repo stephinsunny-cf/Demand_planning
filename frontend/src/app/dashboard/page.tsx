@@ -70,7 +70,7 @@ export default function DashboardPage() {
           {/* KPI Cards */}
           <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-5 gap-4">
             <KPICard
-              title="Items Sold Today"
+              title="Items Sold (Last Synced)"
               value={data?.total_orders_today?.toLocaleString() ?? '—'}
               subtitle="Completed & delivered"
               icon={<ShoppingCart size={18} />}

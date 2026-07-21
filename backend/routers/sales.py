@@ -21,8 +21,14 @@ async def get_sales_pos(
     user: UserContext = Depends(require_role("super_admin", "planning_manager", "demand_planner")),
 ):
     if not start_date or not end_date:
-        if not end_date: end_date = str(date.today())
-        if not start_date: start_date = str(date.today() - timedelta(days=30))
+        max_date_df = query_df("SELECT MAX(CAST(created_at_ist AS DATE)) as max_date FROM pos_orders")
+        if not max_date_df.empty and max_date_df["max_date"].iloc[0] is not None:
+            latest = __import__("pandas").to_datetime(max_date_df["max_date"].iloc[0]).date()
+            if not end_date: end_date = str(latest)
+            if not start_date: start_date = str(latest - timedelta(days=30))
+        else:
+            if not end_date: end_date = str(date.today())
+            if not start_date: start_date = str(date.today() - timedelta(days=30))
 
     where = [f"CAST(o.created_at_ist AS DATE) >= '{start_date}'", f"CAST(o.created_at_ist AS DATE) <= '{end_date}'"]
     if brand:  where.append(f"lower(o.brand_name) = lower('{brand}')")
@@ -53,8 +59,14 @@ async def get_sales_pos_summary(
     user: UserContext = Depends(require_role("super_admin", "planning_manager", "demand_planner")),
 ):
     if not start_date or not end_date:
-        if not end_date: end_date = str(date.today())
-        if not start_date: start_date = str(date.today() - timedelta(days=30))
+        max_date_df = query_df("SELECT MAX(CAST(created_at_ist AS DATE)) as max_date FROM pos_orders")
+        if not max_date_df.empty and max_date_df["max_date"].iloc[0] is not None:
+            latest = __import__("pandas").to_datetime(max_date_df["max_date"].iloc[0]).date()
+            if not end_date: end_date = str(latest)
+            if not start_date: start_date = str(latest - timedelta(days=30))
+        else:
+            if not end_date: end_date = str(date.today())
+            if not start_date: start_date = str(date.today() - timedelta(days=30))
 
     totals = query_df(f"""
         SELECT sum(total_amount) AS total_revenue,
