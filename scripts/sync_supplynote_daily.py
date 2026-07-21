@@ -268,7 +268,7 @@ def sync_stock_via_playwright(page):
                             if (!item.product) continue;
                             let stock = item.currentStock !== undefined ? item.currentStock : (item.stock !== undefined ? item.stock : (item.physicalStock || 0));
                             parsed.push({
-                                outlet: out.outletName || out._id,
+                                outlet: out.name || out.outletName || out._id,
                                 sku: item.product.skuProductCode || item.product._id,
                                 qty_available: parseFloat(stock) || 0.0,
                                 unit: item.product.baseUnit || 'piece'
