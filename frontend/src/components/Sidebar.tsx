@@ -12,6 +12,7 @@ import {
 const NAV = [
   { href: '/dashboard',   label: 'Dashboard',   icon: LayoutDashboard, page: 'dashboard'   },
   { href: '/sales',       label: 'Sales',        icon: TrendingUp,      page: 'sales'       },
+  { href: '/variance',    label: 'Variance',     icon: BarChart2,       page: 'variance'    },
   { href: '/forecast',    label: 'Forecast',     icon: BarChart2,       page: 'forecast'    },
   { href: '/supply',      label: 'Supply Plan',  icon: Truck,           page: 'supply'      },
   { href: '/recipes',     label: 'Recipes',      icon: ChefHat,         page: 'recipes'     },

@@ -4,7 +4,7 @@ import { useAuth } from './useAuth'
 
 const ROLE_ACCESS: Record<string, string[]> = {
   super_admin: ['*'],
-  editor:      ['dashboard', 'sales', 'forecast', 'supply', 'warehouse', 'procurement', 'alerts', 'reports', 'recipes'],
+  editor:      ['dashboard', 'sales', 'variance', 'forecast', 'supply', 'warehouse', 'procurement', 'alerts', 'reports', 'recipes'],
   viewer:      ['dashboard', 'reports', 'alerts'],
 }
 

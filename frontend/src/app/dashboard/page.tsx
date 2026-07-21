@@ -9,6 +9,8 @@ import api from '@/lib/api'
 import { ShoppingCart, Bell, AlertTriangle, Target, Clock, CheckCircle2, TrendingUp, Package, Truck, AlertCircle } from 'lucide-react'
 import { formatDistanceToNow } from 'date-fns'
 
+import useSWR from 'swr'
+
 interface DashboardData {
   total_orders_today:        number
   active_alerts_count:       number
@@ -35,34 +37,35 @@ interface Alert {
   resolved:   number
 }
 
+const fetcher = (url: string) => api.get(url).then(res => res.data)
+
 export default function DashboardPage() {
-  const [data,    setData]    = useState<DashboardData | null>(null)
-  const [loading, setLoading] = useState(true)
-
-  const fetchData = () => {
-    api.get('/api/dashboard/summary')
-      .then(r => setData(r.data))
-      .catch(console.error)
-      .finally(() => setLoading(false))
-  }
-
-  useEffect(() => {
-    fetchData()
-    const interval = setInterval(fetchData, 5 * 60 * 1000) // refresh every 5 min
-    return () => clearInterval(interval)
-  }, [])
+  const { data, error, isLoading, mutate } = useSWR<DashboardData>('/api/dashboard/summary', fetcher, {
+    refreshInterval: 5 * 60 * 1000, // refresh every 5 min for live alerts
+    revalidateOnFocus: false,
+    revalidateOnReconnect: false
+  })
 
   const resolveAlert = async (alertId: string) => {
     await api.post(`/api/alerts/${alertId}/resolve`)
-    fetchData()
+    mutate() // Instantly revalidate the cache after resolving an alert
   }
 
   return (
     <Layout title="Dashboard">
-      {loading ? (
+      {isLoading && !data ? (
         <LoadingSpinner />
       ) : (
         <div className="space-y-6">
+
+          {/* Data as of Timestamp */}
+          {data?.last_data_refresh && (
+            <div className="flex items-center justify-end mb-2">
+              <span className="text-xs font-medium text-slate-400 bg-slate-100 dark:bg-slate-800 px-3 py-1 rounded-full border border-slate-200 dark:border-slate-700">
+                Data as of: {formatDistanceToNow(new Date(data.last_data_refresh), { addSuffix: true })}
+              </span>
+            </div>
+          )}
 
           {/* KPI Cards */}
           <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-5 gap-4">

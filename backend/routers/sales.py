@@ -10,6 +10,95 @@ from backend.database import query_df
 router = APIRouter()
 
 
+@router.get("/sales/pos")
+async def get_sales_pos(
+    start_date: Optional[str] = None,
+    end_date:   Optional[str] = None,
+    brand:      Optional[str] = None,
+    outlet:     Optional[str] = None,
+    city:       Optional[str] = None,
+    sku:        Optional[str] = None, # maps to item_name in POS
+    user: UserContext = Depends(require_role("super_admin", "planning_manager", "demand_planner")),
+):
+    if not start_date or not end_date:
+        if not end_date: end_date = str(date.today())
+        if not start_date: start_date = str(date.today() - timedelta(days=30))
+
+    where = [f"CAST(o.created_at_ist AS DATE) >= '{start_date}'", f"CAST(o.created_at_ist AS DATE) <= '{end_date}'"]
+    if brand:  where.append(f"lower(o.brand_name) = lower('{brand}')")
+    if outlet: where.append(f"lower(o.store_name) = lower('{outlet}')")
+    if city:   where.append(f"lower(o.city) = lower('{city}')")
+    if sku:    where.append(f"lower(i.item_name) LIKE lower('%{sku}%')")
+
+    sql = f"""
+        SELECT CAST(o.created_at_ist AS DATE) as date, i.item_name as sku, o.brand_name as brand, o.store_name as outlet, o.city,
+               sum(i.quantity) AS qty_sold,
+               sum(i.total_price) AS revenue,
+               count(DISTINCT o.id) AS order_count
+        FROM pos_order_items i
+        JOIN pos_orders o ON i.order_id = o.id
+        WHERE {' AND '.join(where)}
+        GROUP BY CAST(o.created_at_ist AS DATE), i.item_name, o.brand_name, o.store_name, o.city
+        ORDER BY date DESC
+        LIMIT 5000
+    """
+    df = query_df(sql)
+    return df.to_dict(orient="records") if not df.empty else []
+
+
+@router.get("/sales/pos/summary")
+async def get_sales_pos_summary(
+    start_date: Optional[str] = None,
+    end_date:   Optional[str] = None,
+    user: UserContext = Depends(require_role("super_admin", "planning_manager", "demand_planner")),
+):
+    if not start_date or not end_date:
+        if not end_date: end_date = str(date.today())
+        if not start_date: start_date = str(date.today() - timedelta(days=30))
+
+    totals = query_df(f"""
+        SELECT sum(total_amount) AS total_revenue,
+               count(id) AS total_orders
+        FROM pos_orders
+        WHERE CAST(created_at_ist AS DATE) >= '{start_date}' AND CAST(created_at_ist AS DATE) <= '{end_date}'
+    """)
+
+    unique_skus_df = query_df(f"""
+        SELECT count(DISTINCT i.item_name) AS unique_skus
+        FROM pos_order_items i
+        JOIN pos_orders o ON i.order_id = o.id
+        WHERE CAST(o.created_at_ist AS DATE) >= '{start_date}' AND CAST(o.created_at_ist AS DATE) <= '{end_date}'
+    """)
+
+    top_skus = query_df(f"""
+        SELECT i.item_name as sku, sum(i.quantity) AS total_qty, sum(i.total_price) AS total_revenue
+        FROM pos_order_items i
+        JOIN pos_orders o ON i.order_id = o.id
+        WHERE CAST(o.created_at_ist AS DATE) >= '{start_date}' AND CAST(o.created_at_ist AS DATE) <= '{end_date}'
+        GROUP BY i.item_name ORDER BY total_qty DESC LIMIT 10
+    """)
+
+    by_brand = query_df(f"""
+        SELECT brand_name as brand, sum(total_amount) AS revenue, count(id) AS orders
+        FROM pos_orders
+        WHERE CAST(created_at_ist AS DATE) >= '{start_date}' AND CAST(created_at_ist AS DATE) <= '{end_date}'
+        GROUP BY brand_name ORDER BY revenue DESC
+    """)
+
+    total_rev = float(totals["total_revenue"].iloc[0]) if not totals.empty and not pd.isna(totals["total_revenue"].iloc[0]) else 0
+    total_ord = int(totals["total_orders"].iloc[0]) if not totals.empty else 0
+    unique_skus = int(unique_skus_df["unique_skus"].iloc[0]) if not unique_skus_df.empty else 0
+
+    return {
+        "total_revenue":    round(total_rev, 2),
+        "total_orders":     total_ord,
+        "avg_order_value":  round(total_rev / total_ord, 2) if total_ord > 0 else 0,
+        "unique_skus":      unique_skus,
+        "top_skus":         top_skus.to_dict(orient="records") if not top_skus.empty else [],
+        "sales_by_brand":   by_brand.to_dict(orient="records") if not by_brand.empty else [],
+    }
+
+
 @router.get("/sales")
 async def get_sales(
     start_date: Optional[str] = None,

@@ -62,9 +62,9 @@ from pipeline.engines      import (
 def run_full_pipeline(use_dummy: bool = False, skip_extract: bool = False):
     """Execute the complete demand planning data pipeline."""
     started_at = datetime.now(IST)
-    log.info("╔══════════════════════════════════════════════════════╗")
-    log.info("║   CUREFOODS DEMAND PLANNING PIPELINE — START         ║")
-    log.info("╚══════════════════════════════════════════════════════╝")
+    log.info("--------------------------------------------------------")
+    log.info("    CUREFOODS DEMAND PLANNING PIPELINE - START          ")
+    log.info("--------------------------------------------------------")
     log.info("Mode: %s", "DUMMY DATA" if use_dummy else "LIVE DATA")
     if skip_extract:
         log.info("Extraction skipped. Processing existing database records.")
@@ -157,6 +157,7 @@ def run_full_pipeline(use_dummy: bool = False, skip_extract: bool = False):
         ingredient_demand_agg = ingredient_demand.groupby("ingredient", as_index=False)["total_qty_needed"].sum()
         ingredient_demand_agg["unit"] = "unit"
     else:
+        ingredient_demand = None
         ingredient_demand_agg = pd.DataFrame(columns=["ingredient", "total_qty_needed", "unit"])
 
 
@@ -172,11 +173,14 @@ def run_full_pipeline(use_dummy: bool = False, skip_extract: bool = False):
     new_alerts = alert_engine.run()
     log_pipeline_run("alert_engine", started_at, "SUCCESS", len(new_alerts) if new_alerts is not None else 0)
 
+    log.info("\n[Engine 8] Cache Engine")
+    cache_engine.run_cache_engine()
+
     # ── SUMMARY ───────────────────────────────────────────────────────────────
     elapsed = (datetime.now(IST) - started_at).total_seconds()
-    log.info("\n╔══════════════════════════════════════════════════════╗")
-    log.info("║   PIPELINE COMPLETE — %.1fs                           ", elapsed)
-    log.info("╚══════════════════════════════════════════════════════╝")
+    log.info("\n--------------------------------------------------------")
+    log.info("    PIPELINE COMPLETE - %.1fs                           ", elapsed)
+    log.info("--------------------------------------------------------")
     log.info("Sales rows:          %d", 0) # Obsolete UrbanPiper engine removed
     log.info("Forecast rows:       %d", len(forecasts) if forecasts is not None else 0)
     log.info("Supply plan rows:    %d", len(supply_plan) if supply_plan is not None else 0)
