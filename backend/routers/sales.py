@@ -38,8 +38,8 @@ async def get_sales_pos(
 
     sql = f"""
         SELECT CAST(o.created_at_ist AS DATE) as date, i.item_name as sku, o.brand_name as brand, o.store_name as outlet, o.city,
-               sum(i.quantity) AS qty_sold,
-               sum(i.total_price) AS revenue,
+               sum(CAST(REPLACE(CAST(i.quantity AS TEXT), ',', '') AS NUMERIC)) AS qty_sold,
+               sum(CAST(REPLACE(CAST(i.total_price AS TEXT), ',', '') AS NUMERIC)) AS revenue,
                count(DISTINCT o.id) AS order_count
         FROM pos_order_items i
         JOIN pos_orders o ON i.order_id = o.id
@@ -69,7 +69,7 @@ async def get_sales_pos_summary(
             if not start_date: start_date = str(date.today() - timedelta(days=30))
 
     totals = query_df(f"""
-        SELECT sum(total_amount) AS total_revenue,
+        SELECT sum(CAST(REPLACE(CAST(total_amount AS TEXT), ',', '') AS NUMERIC)) AS total_revenue,
                count(id) AS total_orders
         FROM pos_orders
         WHERE CAST(created_at_ist AS DATE) >= '{start_date}' AND CAST(created_at_ist AS DATE) <= '{end_date}'
@@ -83,7 +83,7 @@ async def get_sales_pos_summary(
     """)
 
     top_skus = query_df(f"""
-        SELECT i.item_name as sku, sum(i.quantity) AS total_qty, sum(i.total_price) AS total_revenue
+        SELECT i.item_name as sku, sum(CAST(REPLACE(CAST(i.quantity AS TEXT), ',', '') AS NUMERIC)) AS total_qty, sum(CAST(REPLACE(CAST(i.total_price AS TEXT), ',', '') AS NUMERIC)) AS total_revenue
         FROM pos_order_items i
         JOIN pos_orders o ON i.order_id = o.id
         WHERE CAST(o.created_at_ist AS DATE) >= '{start_date}' AND CAST(o.created_at_ist AS DATE) <= '{end_date}'
@@ -91,7 +91,7 @@ async def get_sales_pos_summary(
     """)
 
     by_brand = query_df(f"""
-        SELECT brand_name as brand, sum(total_amount) AS revenue, count(id) AS orders
+        SELECT brand_name as brand, sum(CAST(REPLACE(CAST(total_amount AS TEXT), ',', '') AS NUMERIC)) AS revenue, count(id) AS orders
         FROM pos_orders
         WHERE CAST(created_at_ist AS DATE) >= '{start_date}' AND CAST(created_at_ist AS DATE) <= '{end_date}'
         GROUP BY brand_name ORDER BY revenue DESC
