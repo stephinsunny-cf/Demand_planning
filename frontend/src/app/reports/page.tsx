@@ -10,28 +10,20 @@ import {
 } from 'recharts'
 import { FileText } from 'lucide-react'
 
-export default function ReportsPage() {
-  const [accuracy,  setAccuracy]  = useState<Record<string, unknown>[]>([])
-  const [stockouts, setStockouts] = useState<Record<string, unknown>[]>([])
-  const [wastage,   setWastage]   = useState<Record<string, unknown>[]>([])
-  const [vendor,    setVendor]    = useState<Record<string, unknown>[]>([])
-  const [loading,   setLoading]   = useState(true)
-  const [days,      setDays]      = useState(90)
+import useSWR from 'swr'
 
-  useEffect(() => {
-    setLoading(true)
-    Promise.all([
-      api.get(`/api/reports/accuracy?days=${days}`).catch(() => ({ data: [] })),
-      api.get(`/api/reports/stockouts?days=${days}`).catch(() => ({ data: [] })),
-      api.get(`/api/reports/wastage?days=${days}`).catch(() => ({ data: [] })),
-      api.get('/api/reports/vendor').catch(() => ({ data: [] })),
-    ]).then(([a, s, w, v]) => {
-      setAccuracy(a.data)
-      setStockouts(s.data)
-      setWastage(w.data)
-      setVendor(v.data)
-    }).finally(() => setLoading(false))
-  }, [days])
+const fetcher = (url: string) => api.get(url).then(res => res.data)
+
+export default function ReportsPage() {
+  const [days, setDays] = useState(90)
+
+  const swrOptions = { revalidateOnFocus: false, revalidateOnReconnect: false }
+  const { data: accuracy } = useSWR(`/api/reports/accuracy?days=${days}`, fetcher, swrOptions)
+  const { data: stockouts } = useSWR(`/api/reports/stockouts?days=${days}`, fetcher, swrOptions)
+  const { data: wastage } = useSWR(`/api/reports/wastage?days=${days}`, fetcher, swrOptions)
+  const { data: vendor } = useSWR('/api/reports/vendor', fetcher, swrOptions)
+
+  const loading = !accuracy || !stockouts || !wastage || !vendor
 
   const COLORS = ['#34d399', '#60a5fa', '#a78bfa', '#f59e0b', '#f87171']
 

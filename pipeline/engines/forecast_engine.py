@@ -32,7 +32,10 @@ from backend.database import query_df, get_db_connection
 log = logging.getLogger(__name__)
 IST = timezone(timedelta(hours=5, minutes=30))
 
-MIN_HISTORY_DAYS = 1
+import concurrent.futures
+import os
+
+MIN_HISTORY_DAYS = 30
 FORECAST_HORIZON = 30
 
 
@@ -111,6 +114,7 @@ def _prophet_forecast(history: pd.DataFrame, sku: str, outlet: str) -> pd.DataFr
             holidays=holidays,
             changepoint_prior_scale=0.05,
             seasonality_prior_scale=10,
+            uncertainty_samples=0,
         )
         model.fit(df_prophet)
 
@@ -217,20 +221,32 @@ def run() -> pd.DataFrame:
 
         print(f"Found {len(combos)} SKU x outlet combinations with >= {MIN_HISTORY_DAYS} days of history")
 
-        all_forecasts = []
-        skipped = 0
+        max_workers = max(os.cpu_count() - 1, 1) if os.cpu_count() else 1
+        print(f"Parallelizing Prophet models across {max_workers} workers...")
 
+        args_list = []
         for _, row in combos.iterrows():
             sku    = row["sku"]
             outlet = row["outlet"]
-
             history = sales_df[(sales_df["sku"] == sku) & (sales_df["outlet"] == outlet)].copy()
-            forecast = _prophet_forecast(history, sku, outlet)
+            args_list.append((history, sku, outlet))
 
-            if forecast.empty:
-                skipped += 1
-                continue
-            all_forecasts.append(forecast)
+        all_forecasts = []
+        skipped = 0
+
+        with concurrent.futures.ProcessPoolExecutor(max_workers=max_workers) as executor:
+            futures = [executor.submit(_prophet_forecast, arg[0], arg[1], arg[2]) for arg in args_list]
+            
+            for future in concurrent.futures.as_completed(futures):
+                try:
+                    forecast = future.result()
+                    if forecast.empty:
+                        skipped += 1
+                    else:
+                        all_forecasts.append(forecast)
+                except Exception as exc:
+                    print(f"Worker failed: {exc}")
+                    skipped += 1
 
         if not all_forecasts:
             print("No forecasts generated — possibly too little data")

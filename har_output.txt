@@ -1,0 +1,22 @@
+[POST] https://www.supplynote.in/api/auth/signin
+  Status: 200, MimeType: application/json, Size: 195463
+  Preview: {"_id":"69d89f93e99dda2a6fa094df","referralCode":"STEP0150","updatedAt":"2026-07-14T09:53:57.516Z","createdAt":"2026-04-10T06:58:27.558Z","provider":"local","name":"STEPHIN SUNNY","username":"stephin_...
+[GET] https://www.supplynote.in/api/users/me
+  Status: 200, MimeType: application/json, Size: 529948
+  Preview: {"_id":"69d89f93e99dda2a6fa094df","referralCode":"STEP0150","updatedAt":"2026-07-14T09:53:57.516Z","createdAt":"2026-04-10T06:58:27.558Z","provider":"local","name":"STEPHIN SUNNY","username":"stephin_...
+[GET] https://www.supplynote.in/modules/core/client/views/home.client.view.html
+  Status: 200, MimeType: text/html, Size: 170152
+  Preview: <style type="text/css">
+  /* ────────────────────────────────────────────
+     Design tokens — refined neutral with indigo accent.
+     Tinted toward brand hue (236°) so the entire surface feels cohes...
+[POST] https://reporting-api.supplynote.in/api/v1/dashboard/getConsolidatedValuation
+  Status: 200, MimeType: application/json, Size: 1208703
+  Preview: {"data":[{"outlet":"65b205675255c93a41dd784c","outletName":"AMD Vastrapur","outletType":"kitchen","openingValue":307008.70151979994,"closingValue":232753.73073018008,"val_StockIn":141165.95784,"val_St...
+[POST] https://reporting-api.supplynote.in/api/v1/dashboard/getConsolidatedValuation
+  Status: 200, MimeType: application/json, Size: 1208703
+[POST] https://reporting-api.supplynote.in/api/v1/dashboard/pos/menuPerformance
+  Status: 200, MimeType: application/json, Size: 13873
+[GET] https://www.supplynote.in/api/outlets?buisness=65b205675255c93a41dd7849
+  Status: 200, MimeType: application/json, Size: 4643146
+  Preview: [{"_id":"6a324096f753fd5daa082db3","updatedAt":"2026-07-15T04:20:53.617Z","createdAt":"2026-06-17T06:37:11.053Z","createdBy":"62d509964c7fe546c170785c","country":"India","name":"BBI OLIO Chandrasekhar...

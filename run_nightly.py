@@ -14,7 +14,7 @@ def log(msg):
     ts = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     line = f"[{ts}] {msg}"
     print(line)
-    with open(LOG_FILE, "a") as f:
+    with open(LOG_FILE, "a", encoding="utf-8") as f:
         f.write(line + "\n")
 
 def run(script):
@@ -22,7 +22,8 @@ def run(script):
     result = subprocess.run(
         [sys.executable, script],
         cwd=os.path.dirname(__file__),
-        capture_output=True, text=True
+        capture_output=True, text=True, encoding="utf-8",
+        env={**os.environ, "PYTHONIOENCODING": "utf-8"}
     )
     if result.stdout:
         log(result.stdout.strip())
@@ -38,14 +39,11 @@ if __name__ == "__main__":
     log("NIGHTLY UPDATE STARTED")
     log("=" * 60)
 
-    # 1. Refresh live stock from SupplyNote (all 368 outlets)
-    run("pipeline/stock_extractor.py")
+    # 1. Fetch live stock from SupplyNote API directly
+    run("scripts/sync_supplynote_daily.py")
 
-    # 2. Update today's sales data from UrbanPiper
-    run("pipeline/daily_sales_updater.py")
-
-    # 3. Refresh recipe master (BOMs + yield factors)
-    run("pipeline/recipe_extractor.py")
+    # 2. Run the Full Demand Planning Pipeline (Sales, Forecast, Supply, Warehouse, Procurement, Alerts)
+    run("pipeline/main.py")
 
     log("NIGHTLY UPDATE COMPLETE")
     log("=" * 60)
