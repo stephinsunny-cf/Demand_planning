@@ -1,31 +1,45 @@
-import os
 import pandas as pd
-from sqlalchemy import create_engine, text
-from dotenv import load_dotenv
+from backend.database import get_db_connection
 
-load_dotenv(r'd:\demand-planning\.env')
-pg_url = f"postgresql://{os.getenv('PG_USER')}:{os.getenv('PG_PASS')}@{os.getenv('PG_HOST')}:{os.getenv('PG_PORT')}/{os.getenv('PG_DB')}"
-engine = create_engine(pg_url)
+def seed_fake_test():
+    print("Seeding un-clobberable fake golden test case...")
+    with get_db_connection() as conn:
+        with conn.cursor() as cur:
+            # 1. Procurement Tracker
+            cur.execute("DELETE FROM procurement_tracker WHERE code = 'CFTEST999'")
+            cur.execute("""
+                INSERT INTO procurement_tracker (code, ingredient)
+                VALUES ('CFTEST999', 'Fake Test Ingredient')
+            """)
+            
+            # 2. Recipe Master (100+1 clash)
+            cur.execute("DELETE FROM recipe_master WHERE ingredient = 'CFTEST999'")
+            cur.execute("""
+                INSERT INTO recipe_master (dish_name, ingredient, qty_per_unit, unit)
+                VALUES 
+                    ('Fake Test Dish 999', 'CFTEST999', 100.0, 'g'),
+                    ('Fake Test Dish 888', 'CFTEST999', 1.0, 'g')
+            """)
+            
+            # 3. Item Alias Mapping (Map both fake dishes to the real POS item 'Palak Paneer Khichdi')
+            cur.execute("DELETE FROM item_alias_mapping WHERE recipe_name LIKE 'Fake Test Dish%'")
+            cur.execute("""
+                INSERT INTO item_alias_mapping (pos_name, recipe_name, multiplier, confidence)
+                VALUES 
+                    ('Palak Paneer Khichdi', 'Fake Test Dish 999', 1.0, 'high'),
+                    ('Palak Paneer Khichdi', 'Fake Test Dish 888', 1.0, 'high')
+            """)
+            
+            # 4. Actual Usage (fact_daily_sales) for July 16
+            cur.execute("DELETE FROM fact_daily_sales WHERE sku = 'CFTEST999'")
+            cur.execute("""
+                INSERT INTO fact_daily_sales (date, outlet, sku, brand, city, qty_sold, revenue, order_count)
+                VALUES 
+                    ('2026-07-16', 'Khichdi Tales Jlt', 'CFTEST999', 'Fake Brand', 'Fake City', 90.0, 0, 1)
+            """)
+            
+        conn.commit()
+    print("Seeded fake test data.")
 
-with engine.begin() as conn:
-    # 1. Insert POS Order
-    conn.execute(text("""
-        INSERT INTO pos_orders (id, store_name, created_at_ist)
-        VALUES ('test_order_9999', 'Khichdi Tales Jlt', '2026-07-16 12:00:00')
-        ON CONFLICT (id) DO NOTHING;
-    """))
-    
-    # 2. Insert POS Order Item (1 Palak Paneer Khichdi -> Expected 101g CFIDG232)
-    conn.execute(text("""
-        INSERT INTO pos_order_items (id, order_id, item_name, quantity, option_names)
-        VALUES ('test_item_9999', 'test_order_9999', 'Palak Paneer Khichdi', 1, NULL)
-        ON CONFLICT (id) DO NOTHING;
-    """))
-
-    # 3. Insert SupplyNote Actual Consumption (Actual 90g CFIDG232)
-    conn.execute(text("""
-        INSERT INTO fact_daily_sales (date, outlet, sku, qty_sold, revenue)
-        VALUES ('2026-07-16', 'Khichdi Tales Jlt', 'CFIDG232', 90.0, 0.0)
-    """))
-
-print("Successfully inserted deliberate test case: Expected=101, Actual=90 for 2026-07-16")
+if __name__ == '__main__':
+    seed_fake_test()
