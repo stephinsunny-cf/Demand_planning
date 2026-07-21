@@ -189,7 +189,7 @@ def upsert_to_db(df_facts, dim_ingredients, dim_outlets, mapping):
                 ON CONFLICT (sku) DO UPDATE SET
                     name=EXCLUDED.name, category=EXCLUDED.category,
                     is_packaged=EXCLUDED.is_packaged, measuring_unit=EXCLUDED.measuring_unit
-            """, ing_data)
+            """, ing_data, page_size=10000)
 
         # dim_outlets
         out_data = [(o, d["name"], d["city"]) for o, d in dim_outlets.items()]
@@ -197,14 +197,14 @@ def upsert_to_db(df_facts, dim_ingredients, dim_outlets, mapping):
             execute_values(cursor, """
                 INSERT INTO dim_outlets (outlet, name, city) VALUES %s
                 ON CONFLICT (outlet) DO UPDATE SET name=EXCLUDED.name, city=EXCLUDED.city
-            """, out_data)
+            """, out_data, page_size=10000)
 
         # kitchen_ingredient_mapping
         if mapping:
             execute_values(cursor, """
                 INSERT INTO kitchen_ingredient_mapping (outlet, sku) VALUES %s
                 ON CONFLICT (outlet, sku) DO NOTHING
-            """, list(mapping))
+            """, list(mapping), page_size=10000)
 
         # fact_daily_sales
         if df_facts is not None and len(df_facts) > 0:

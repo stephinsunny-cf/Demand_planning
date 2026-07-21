@@ -13,7 +13,10 @@ os.makedirs(os.path.dirname(LOG_FILE), exist_ok=True)
 def log(msg):
     ts = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     line = f"[{ts}] {msg}"
-    print(line)
+    try:
+        print(line)
+    except UnicodeEncodeError:
+        print(line.encode(sys.stdout.encoding or 'ascii', 'replace').decode(sys.stdout.encoding or 'ascii'))
     with open(LOG_FILE, "a", encoding="utf-8") as f:
         f.write(line + "\n")
 
