@@ -175,7 +175,7 @@ def run() -> list:
         try:
             # We don't have dim_menu_items in PG, let's use fact_forecast distinct SKUs
             active_skus = query_df("SELECT DISTINCT sku FROM fact_forecast")
-            recipe_dishes = query_df("SELECT DISTINCT lower(trim(dish_name)) AS dish FROM dim_recipe_master")
+            recipe_dishes = query_df("SELECT DISTINCT lower(trim(dish_name)) AS dish FROM recipe_master")
             if not active_skus.empty and not recipe_dishes.empty:
                 active_skus["sku_lower"] = active_skus["sku"].str.lower().str.strip()
                 recipe_set = set(recipe_dishes["dish"].tolist())

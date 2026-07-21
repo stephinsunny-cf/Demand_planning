@@ -100,7 +100,7 @@ def job_urbanpiper_recipes():
     data = urbanpiper.extract_all(use_dummy=use_dummy)
     recipe_clean = clean.clean_recipe_master(data.get("recipe_master"))
     recipe_clean = uom_converter.convert_df_uom(recipe_clean, "qty_per_portion", "unit", "ingredient")
-    loader.insert_df(recipe_clean, "dim_recipe_master")
+    loader.insert_df(recipe_clean, "recipe_master")
 
 
 def job_supplynote_kitchen_stock():

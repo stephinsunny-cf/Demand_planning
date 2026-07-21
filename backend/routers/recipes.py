@@ -14,7 +14,6 @@ class RecipeUpdateItem(BaseModel):
     ingredient:      str
     qty_per_portion: float
     unit:            str
-    yield_factor:    float = 1.0
 
 
 @router.get("/recipes")
@@ -29,13 +28,13 @@ async def get_recipes(
         SELECT 
             r.dish_name, 
             r.ingredient, 
-            r.qty_per_portion, 
+            r.qty_per_unit AS qty_per_portion, 
             r.unit, 
-            r.yield_factor,
+            1.0 AS yield_factor,
             pt.code as sku_code,
             CASE WHEN pt.ingredient IS NOT NULL THEN true ELSE false END as is_tracked
-        FROM dim_recipe_master r
-        LEFT JOIN procurement_tracker pt ON r.ingredient = pt.ingredient
+        FROM recipe_master r
+        LEFT JOIN procurement_tracker pt ON r.ingredient = pt.code
         WHERE {' AND '.join(where)}
         ORDER BY r.dish_name, r.ingredient
         LIMIT 2000
@@ -60,20 +59,18 @@ async def update_recipe(
     for item in items:
         records.append((
             dish_name.lower().strip(),
-            None, # sku_code
             item.ingredient.lower().strip(),
             item.qty_per_portion,
-            item.unit,
-            min(max(item.yield_factor, 0.01), 1.0)
+            item.unit
         ))
 
     with get_db_connection() as conn:
         with conn.cursor() as cur:
             # Delete old recipe for this dish
-            cur.execute("DELETE FROM dim_recipe_master WHERE lower(dish_name) = lower(%s)", (dish_name,))
+            cur.execute("DELETE FROM recipe_master WHERE lower(dish_name) = lower(%s)", (dish_name,))
             # Insert new recipe
             insert_query = """
-                INSERT INTO dim_recipe_master (dish_name, sku_code, ingredient, qty_per_portion, unit, yield_factor)
+                INSERT INTO recipe_master (dish_name, ingredient, qty_per_unit, unit)
                 VALUES %s
             """
             execute_values(cur, insert_query, records)

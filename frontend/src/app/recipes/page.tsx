@@ -13,7 +13,6 @@ interface Recipe {
   ingredient:      string
   qty_per_portion: number
   unit:            string
-  yield_factor:    number
   updated_at:      string
   brand:           string
 }
@@ -56,7 +55,6 @@ export default function RecipesPage() {
       ingredient:      r.ingredient,
       qty_per_portion: r.qty_per_portion,
       unit:            r.unit,
-      yield_factor:    r.yield_factor,
     })))
     setEditDish(null)
     fetchData()
@@ -76,10 +74,6 @@ export default function RecipesPage() {
     )},
     { key: 'qty_per_portion', label: 'Qty/Portion',  sortable: true, render: (v: unknown) => Number(v).toFixed(2) },
     { key: 'unit',            label: 'Unit',         sortable: false },
-    { key: 'yield_factor',    label: 'Yield Factor', sortable: true, render: (v: unknown) => {
-      const n = Number(v)
-      return <span className={n < 0.9 ? 'text-amber-400' : 'text-slate-600 dark:text-slate-300'}>{n.toFixed(2)}</span>
-    }},
     { key: 'updated_at', label: 'Updated', sortable: true, render: (v: unknown) => v ? String(v).slice(0, 10) : '—' },
     ...(canEdit ? [{
       key: 'dish_name',
@@ -162,12 +156,6 @@ export default function RecipesPage() {
                     <label className="text-xs text-slate-500 mb-1 block">Unit</label>
                     <input value={row.unit}
                       onChange={e => setEditRows(prev => prev.map((r, j) => j === i ? { ...r, unit: e.target.value } : r))}
-                      className="w-full bg-slate-700 border border-slate-600 rounded-lg px-2 py-1 text-sm text-slate-900 dark:text-white focus:outline-none focus:border-emerald-500" />
-                  </div>
-                  <div>
-                    <label className="text-xs text-slate-500 mb-1 block">Yield Factor</label>
-                    <input type="number" step="0.01" min="0.01" max="1" value={row.yield_factor}
-                      onChange={e => setEditRows(prev => prev.map((r, j) => j === i ? { ...r, yield_factor: parseFloat(e.target.value) } : r))}
                       className="w-full bg-slate-700 border border-slate-600 rounded-lg px-2 py-1 text-sm text-slate-900 dark:text-white focus:outline-none focus:border-emerald-500" />
                   </div>
                 </div>

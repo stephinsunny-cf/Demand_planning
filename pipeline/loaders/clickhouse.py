@@ -27,7 +27,7 @@ IST = timezone(timedelta(hours=5, minutes=30))
 
 REPLACING_TABLES = {
     "dim_menu_items",
-    "dim_recipe_master",
+    "recipe_master",
     "dim_vendor_master",
     "dim_safety_stock",
 }
