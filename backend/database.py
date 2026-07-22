@@ -70,5 +70,8 @@ def get_db_connection():
 
 def query_df(sql: str, params: tuple = None):
     import pandas as pd
+    import numpy as np
     with get_db() as conn:
-        return pd.read_sql_query(sql, conn, params=params)
+        df = pd.read_sql_query(sql, conn, params=params)
+        df = df.replace([np.inf, -np.inf], np.nan)
+        return df.where(pd.notnull(df), None)

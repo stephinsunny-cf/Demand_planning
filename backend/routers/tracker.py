@@ -3,6 +3,7 @@ from pydantic import BaseModel
 from typing import Optional
 from backend.auth import get_current_user, UserContext, require_role
 from backend.database import query_df, get_db_connection
+from backend.utils import safe_json_response
 
 router = APIRouter(prefix="/tracker", tags=["tracker"])
 
@@ -25,7 +26,7 @@ async def get_tracked_items(
         FROM procurement_tracker
         ORDER BY ingredient
     """)
-    return df.to_dict(orient="records") if not df.empty else []
+    return safe_json_response(df.to_dict(orient="records") if not df.empty else [])
 
 @router.post("")
 async def add_tracked_item(

@@ -483,18 +483,8 @@ def _dummy_vendor_master() -> pd.DataFrame:
 
 # ── Public API ────────────────────────────────────────────────────────────────
 
-def extract_all(use_dummy: bool = False) -> dict[str, pd.DataFrame]:
+def extract_all() -> dict[str, pd.DataFrame]:
     """Extract all SupplyNote datasets. Falls back gracefully on failures."""
-    if use_dummy:
-        log.info("SupplyNote: using dummy data")
-        return {
-            "kitchen_stock":   _dummy_kitchen_stock(),
-            "warehouse_stock": _dummy_warehouse_stock(),
-            "open_pos":        _dummy_open_pos(),
-            "grn_log":         _dummy_grn_log(),
-            "vendor_master":   _dummy_vendor_master(),
-        }
-
     results = {}
     tasks = {
         "kitchen_stock":   pull_kitchen_stock,

@@ -31,7 +31,7 @@ async def get_supply_plan(
         SELECT f.ingredient AS sku, f.outlet AS kitchen,
                sum(f.total_qty_needed) AS forecast_3day
         FROM fact_ingredient_demand f
-        JOIN procurement_tracker pt ON f.ingredient = pt.ingredient
+        JOIN procurement_tracker pt ON lower(f.ingredient) = lower(pt.code)
         WHERE f.forecast_date >= '{today}' AND f.forecast_date <= '{in_3d}'
         GROUP BY f.ingredient, f.outlet
     """)

@@ -59,7 +59,7 @@ def run() -> pd.DataFrame:
 
         # Dynamic Lead Time settings from Procurement Tracker
         safety_df = query_df(
-            "SELECT ingredient AS sku, lead_time_days AS safety_stock_days "
+            "SELECT lower(code) AS sku, lead_time_days AS safety_stock_days "
             "FROM procurement_tracker"
         )
 
