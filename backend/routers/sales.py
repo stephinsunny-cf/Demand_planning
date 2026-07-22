@@ -3,9 +3,10 @@
 from datetime import date, timedelta
 from typing import Optional
 from fastapi import APIRouter, Depends, Query
-
-from backend.auth     import get_current_user, UserContext, require_role
+import pandas as pd
 from backend.database import query_df
+from backend.auth import get_current_user, UserContext, require_role
+from backend.utils import safe_json_response
 
 router = APIRouter()
 
@@ -51,7 +52,7 @@ async def get_sales_pos(
     import pandas as pd
     df = query_df(sql)
     df = df.where(pd.notnull(df), None)
-    return df.to_dict(orient="records") if not df.empty else []
+    return safe_json_response(df.to_dict(orient="records") if not df.empty else [])
 
 
 @router.get("/sales/pos/summary")
@@ -104,14 +105,14 @@ async def get_sales_pos_summary(
     total_ord = int(totals["total_orders"].iloc[0]) if not totals.empty and pd.notna(totals["total_orders"].iloc[0]) else 0
     unique_skus = int(unique_skus_df["unique_skus"].iloc[0]) if not unique_skus_df.empty and pd.notna(unique_skus_df["unique_skus"].iloc[0]) else 0
 
-    return {
+    return safe_json_response({
         "total_revenue":    round(total_rev, 2),
         "total_orders":     total_ord,
         "avg_order_value":  round(total_rev / total_ord, 2) if total_ord > 0 else 0,
         "unique_skus":      unique_skus,
         "top_skus":         top_skus.to_dict(orient="records") if not top_skus.empty else [],
         "sales_by_brand":   by_brand.to_dict(orient="records") if not by_brand.empty else [],
-    }
+    })
 
 
 @router.get("/sales")
@@ -155,7 +156,7 @@ async def get_sales(
     import pandas as pd
     df = query_df(sql)
     df = df.where(pd.notnull(df), None)
-    return df.to_dict(orient="records") if not df.empty else []
+    return safe_json_response(df.to_dict(orient="records") if not df.empty else [])
 
 
 @router.get("/sales/summary")
@@ -201,11 +202,11 @@ async def get_sales_summary(
     total_ord = int(totals["total_orders"].iloc[0]) if not totals.empty and pd.notna(totals["total_orders"].iloc[0]) else 0
     unique_skus = int(totals["unique_skus"].iloc[0]) if not totals.empty and pd.notna(totals["unique_skus"].iloc[0]) else 0
 
-    return {
+    return safe_json_response({
         "total_revenue":    round(total_rev, 2),
         "total_orders":     total_ord,
         "avg_order_value":  round(total_rev / total_ord, 2) if total_ord > 0 else 0,
         "unique_skus":      unique_skus,
         "top_skus":         top_skus.to_dict(orient="records") if not top_skus.empty else [],
         "sales_by_brand":   by_brand.to_dict(orient="records") if not by_brand.empty else [],
-    }
+    })

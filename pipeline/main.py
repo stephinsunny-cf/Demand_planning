@@ -56,16 +56,18 @@ from pipeline.engines      import (
     warehouse_planning,
     procurement_engine,
     alert_engine,
+    variance_engine,
+    cache_engine,
 )
 
 
-def run_full_pipeline(use_dummy: bool = False, skip_extract: bool = False):
+def run_full_pipeline(skip_extract: bool = False):
     """Execute the complete demand planning data pipeline."""
     started_at = datetime.now(IST)
     log.info("--------------------------------------------------------")
     log.info("    CUREFOODS DEMAND PLANNING PIPELINE - START          ")
     log.info("--------------------------------------------------------")
-    log.info("Mode: %s", "DUMMY DATA" if use_dummy else "LIVE DATA")
+    log.info("Mode: LIVE DATA")
     if skip_extract:
         log.info("Extraction skipped. Processing existing database records.")
     log.info("Started at: %s", started_at.strftime("%Y-%m-%d %H:%M:%S %Z"))
@@ -75,7 +77,7 @@ def run_full_pipeline(use_dummy: bool = False, skip_extract: bool = False):
         log.info("\n── STEP 1: EXTRACT ──────────────────────────────────────")
 
         log.info("Extracting from SupplyNote...")
-        sn_data = supplynote.extract_all(use_dummy=use_dummy)
+        sn_data = supplynote.extract_all()
 
         # ── STEP 2: TRANSFORM / CLEAN ─────────────────────────────────────────────
         log.info("\n── STEP 2: CLEAN & TRANSFORM ────────────────────────────")
@@ -115,6 +117,10 @@ def run_full_pipeline(use_dummy: bool = False, skip_extract: bool = False):
     log.info("\n[Engine 3] Supply Planning")
     supply_plan = supply_planning.run()
     # supply_planning logs itself
+
+    log.info("\n[Engine 4] Variance Engine")
+    variance_analysis = variance_engine.run_variance_engine()
+    log_pipeline_run("variance_engine", started_at, "SUCCESS", len(variance_analysis) if variance_analysis is not None else 0)
 
     # Bypassed Engine 4: Recipe Explosion (we forecast ingredients directly now!)
     # Convert forecast directly into ingredient demand for warehouse planning
@@ -207,5 +213,5 @@ if __name__ == "__main__":
                         help="Skip extraction and process existing database records")
     args = parser.parse_args()
 
-    use_dummy = args.dummy or os.getenv("USE_DUMMY_DATA", "false").lower() == "true"
-    run_full_pipeline(use_dummy=use_dummy, skip_extract=args.process_only)
+    use_dummy = os.getenv("USE_DUMMY_DATA", "false").lower() == "true"
+    run_full_pipeline(skip_extract=args.process_only)

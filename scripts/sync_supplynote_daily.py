@@ -306,10 +306,15 @@ def upsert_stock_to_db(stock_list):
     try:
         ensure_tables(cursor)
         
+        # Filter out ingredients we don't care about (reduces 600k rows to ~10k)
+        cursor.execute("SELECT code FROM procurement_tracker")
+        tracked_skus = {row[0] for row in cursor.fetchall()}
+        filtered_stock_list = [s for s in stock_list if s['sku'] in tracked_skus]
+        
         today = datetime.now().strftime("%Y-%m-%d")
         fact_data = [
             (today, s['outlet'], s['sku'], s['qty_available'], s['unit'])
-            for s in stock_list
+            for s in filtered_stock_list
         ]
         
         if fact_data:

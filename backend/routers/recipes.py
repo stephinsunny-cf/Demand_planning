@@ -6,6 +6,7 @@ from pydantic import BaseModel
 
 from backend.auth     import require_role, UserContext
 from backend.database import query_df, get_db
+from backend.utils    import safe_json_response
 
 router = APIRouter()
 
@@ -41,7 +42,7 @@ async def get_recipes(
     """)
     import pandas as pd
     df = df.where(pd.notnull(df), None)
-    return df.to_dict(orient="records") if not df.empty else []
+    return safe_json_response(df.to_dict(orient="records") if not df.empty else [])
 
 
 @router.put("/recipes/{dish_name}")

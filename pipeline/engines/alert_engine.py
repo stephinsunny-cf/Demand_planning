@@ -73,7 +73,7 @@ def run() -> list:
         def is_new(alert_type: str, sku: str = "", outlet: str = "", ingredient: str = "") -> bool:
             return (str(alert_type), str(sku), str(outlet), str(ingredient)) not in existing_set
 
-        # RULE 1: Kitchen stock = 0 (using fast DISTINCT ON instead of correlated subquery)
+        # RULE 1: Kitchen stock = 0 for active outlet/SKU pairs
         try:
             kitchen_zero = query_df("""
                 WITH latest_stock AS (
@@ -81,10 +81,16 @@ def run() -> list:
                         kitchen, ingredient, qty_available
                     FROM fact_kitchen_stock
                     ORDER BY kitchen, ingredient, snapshot_date DESC
+                ),
+                active_outlets AS (
+                    SELECT DISTINCT outlet, sku
+                    FROM fact_daily_sales
+                    WHERE date >= (SELECT MAX(date) FROM fact_daily_sales) - INTERVAL '14 days'
                 )
-                SELECT kitchen, ingredient, qty_available
-                FROM latest_stock
-                WHERE qty_available <= 0
+                SELECT ls.kitchen, ls.ingredient, ls.qty_available
+                FROM latest_stock ls
+                JOIN active_outlets ao ON lower(ls.kitchen) = lower(ao.outlet) AND lower(ls.ingredient) = lower(ao.sku)
+                WHERE ls.qty_available <= 0
             """)
             if not kitchen_zero.empty:
                 for _, r in kitchen_zero.iterrows():

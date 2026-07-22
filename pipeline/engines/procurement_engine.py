@@ -74,7 +74,7 @@ def run() -> pd.DataFrame:
 
         # 4. Vendor master (lead times, MOQs, prices)
         vendor_df = query_df("""
-            SELECT 'Default Vendor' AS vendor_name, ingredient, lead_time_days, 1 AS moq, 'KG' AS unit, 100 AS price
+            SELECT 'Default Vendor' AS vendor_name, lower(code) AS ingredient, lead_time_days, 1 AS moq, 'KG' AS unit, 100 AS price
             FROM procurement_tracker
         """)
 
