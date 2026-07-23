@@ -51,7 +51,7 @@ export default function WarehousePage() {
           { label: 'Sufficient',         value: counts.GREEN, icon: CheckCircle,   color: 'emerald', s: 'GREEN' },
         ].map(({ label, value, icon: Icon, color, s }) => (
           <button key={s}
-            onClick={() => { setStatus(status === s ? '' : s); fetchData(status === s ? '' : s) }}
+            onClick={() => { setStatus(status === s ? '' : s); mutate(true) }}
             className={`flex items-center gap-4 p-4 rounded-2xl border transition-all hover:scale-[1.02] text-left
               bg-${color}-500/10 border-${color}-500/20`}>
             <Icon size={22} className={`text-${color}-400`} />
@@ -70,7 +70,7 @@ export default function WarehousePage() {
                      placeholder-slate-600 focus:outline-none focus:border-emerald-500 w-48" />
         <div className="flex rounded-lg overflow-hidden border border-slate-300 dark:border-slate-700">
           {['', 'RED', 'YELLOW', 'GREEN'].map(s => (
-            <button key={s || 'ALL'} onClick={() => { setStatus(s); fetchData(s) }}
+            <button key={s || 'ALL'} onClick={() => { setStatus(s); mutate(true) }}
               className={`px-3 py-1.5 text-xs font-medium transition-colors
                 ${status === s ? 'bg-emerald-500 text-slate-900 dark:text-white' : 'bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400 hover:bg-slate-700'}`}>
               {s || 'ALL'}
