@@ -22,6 +22,7 @@ export function useAuth() {
         }
         const token = session.access_token
         localStorage.setItem('sb-token', token)
+        document.cookie = `sb-token=${token}; path=/; max-age=86400; SameSite=Lax`
         setUser({ id: session.user.id, email: session.user.email!, role })
       }
       setLoading(false)
@@ -34,10 +35,12 @@ export function useAuth() {
           role = 'super_admin'
         }
         localStorage.setItem('sb-token', session.access_token)
+        document.cookie = `sb-token=${session.access_token}; path=/; max-age=86400; SameSite=Lax`
         setUser({ id: session.user.id, email: session.user.email!, role })
       } else {
         setUser(null)
         localStorage.removeItem('sb-token')
+        document.cookie = 'sb-token=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT'
       }
     })
 
@@ -57,6 +60,7 @@ export function useAuth() {
     await supabase.auth.signOut()
     setUser(null)
     localStorage.removeItem('sb-token')
+    document.cookie = 'sb-token=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT'
   }, [])
 
   return { user, loading, signInWithGoogle, signInWithEmail, signOut }
