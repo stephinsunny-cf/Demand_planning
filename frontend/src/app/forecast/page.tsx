@@ -126,7 +126,7 @@ export default function ForecastPage() {
             
             {/* Apply Button */}
             <div className="flex flex-col gap-1.5 self-end">
-               <button onClick={fetchData}
+               <button onClick={() => mutate(true)}
                  className="px-4 py-2 rounded-lg bg-emerald-500 hover:bg-emerald-400 text-white text-sm font-medium transition-colors h-[42px] min-w-[100px] shadow-sm">
                  Apply Filters
                </button>

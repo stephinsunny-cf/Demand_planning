@@ -77,8 +77,8 @@ export default function VariancePage() {
              <input placeholder="Search..." value={ingredient} onChange={e => setIngredient(e.target.value)}
                className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-lg px-3 py-2 text-sm text-slate-700 dark:text-slate-200 placeholder-slate-600 focus:outline-none focus:border-emerald-500 w-40" />
           </div>
-          <div className="flex flex-col gap-1.5 self-end">
-             <button onClick={fetchData}
+           <div className="flex flex-col gap-1.5 self-end">
+             <button onClick={() => mutate(true)}
                className="px-4 py-2 rounded-lg bg-emerald-500 hover:bg-emerald-400 text-white text-sm font-medium transition-colors h-9">
                Apply
              </button>
