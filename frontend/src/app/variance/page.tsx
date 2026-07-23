@@ -67,7 +67,7 @@ export default function VariancePage() {
              </button>
           </div>
           <div className="ml-auto self-end h-9 flex items-center">
-            <ExportButton data={filteredRows} filename="variance_report" sheetName="Variance" />
+            <ExportButton data={rows} filename="variance_report" sheetName="Variance" />
           </div>
         </div>
       </div>
