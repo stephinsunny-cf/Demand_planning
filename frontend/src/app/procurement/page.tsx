@@ -68,7 +68,7 @@ export default function ProcurementPage() {
       <div className="flex items-center gap-3 mb-4 card p-4 rounded-xl">
         <div className="flex rounded-lg overflow-hidden border border-slate-300 dark:border-slate-700">
           {['', 'URGENT', 'NORMAL'].map(u => (
-            <button key={u || 'ALL'} onClick={() => { setUrgency(u); fetchData(u) }}
+            <button key={u || 'ALL'} onClick={() => { setUrgency(u); mutate(true) }}
               className={`px-3 py-1.5 text-xs font-medium transition-colors
                 ${urgency === u ? 'bg-emerald-500 text-slate-900 dark:text-white' : 'bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400 hover:bg-slate-700'}`}>
               {u || 'ALL'}
