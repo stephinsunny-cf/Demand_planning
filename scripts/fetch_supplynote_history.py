@@ -158,24 +158,24 @@ def run():
     })
 
     start_date = date(2026, 1, 1)
-    end_date   = date.today() - timedelta(days=1)  # up to yesterday
+    end_date   = datetime.now().date()
 
     all_records = []
     seen_version_keys = set()  # Avoid downloading same version twice
 
-    curr_date = start_date
-    log.info(f"Fetching ALL INGREDIENT DATA from {start_date} to {end_date} ...")
+    curr_date = end_date
+    log.info(f"Fetching ALL INGREDIENT DATA backwards from {end_date} down to {start_date} ...")
 
-    while curr_date <= end_date:
+    while curr_date >= start_date:
         version_key = get_version_key(token, curr_date)
         if not version_key:
-            curr_date += timedelta(days=1)
+            curr_date -= timedelta(days=1)
             continue
 
         # Skip if we already downloaded this version (same upload covers multiple dates)
         if version_key in seen_version_keys:
             log.info(f"  {curr_date}: version {version_key} already downloaded, skipping.")
-            curr_date += timedelta(days=1)
+            curr_date -= timedelta(days=1)
             continue
 
         seen_version_keys.add(version_key)
@@ -183,29 +183,38 @@ def run():
         s3_url = get_download_url(session, token, version_key)
         if not s3_url:
             log.warning(f"  {curr_date}: Could not get S3 URL for version {version_key}")
-            curr_date += timedelta(days=1)
+            curr_date -= timedelta(days=1)
             continue
 
         df = download_csv(s3_url)
         if df is None or df.empty:
             log.warning(f"  {curr_date}: Empty or failed CSV for version {version_key}")
-            curr_date += timedelta(days=1)
+            curr_date -= timedelta(days=1)
             continue
+            
+        # Save raw CSV to project folder
+        try:
+            download_dir = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "supplynote_downloads")
+            os.makedirs(download_dir, exist_ok=True)
+            csv_path = os.path.join(download_dir, f"supplynote_{curr_date}.csv")
+            df.to_csv(csv_path, index=False)
+            log.info(f"  Saved raw CSV to {csv_path}")
+        except Exception as e:
+            log.warning(f"  Failed to save raw CSV to folder: {e}")
 
         # Map columns — we know from inspection the CSV has these columns:
         # versionKey, date, kitchenId, kitchenCode, city, kitchenName,
         # ingredientId, ingredientCode, ingredientName, ingredientCategory,
         # isPackaged, measuringUnit, plannedDemand, rolloverDemand, currentlyAvailable, sold, oos
 
-        # Use ingredientCode + kitchenCode as dedup keys (IDs = zero duplicates vs names = 619)
         if 'ingredientCode' not in df.columns or 'kitchenCode' not in df.columns:
             log.warning(f"  {curr_date}: Missing ingredientCode/kitchenCode. Columns: {list(df.columns)}")
-            curr_date += timedelta(days=1)
+            curr_date -= timedelta(days=1)
             continue
 
         if 'ingredientName' not in df.columns or 'plannedDemand' not in df.columns:
             log.warning(f"  {curr_date}: Unexpected columns: {list(df.columns)}")
-            curr_date += timedelta(days=1)
+            curr_date -= timedelta(days=1)
             continue
 
         df['date_parsed'] = pd.to_datetime(df.get('date', str(curr_date)), format='%d-%m-%Y', errors='coerce').fillna(curr_date)
@@ -213,7 +222,7 @@ def run():
 
         # Keep the code alongside the name for reliable deduplication
         records = df[['date_parsed', 'ingredientCode', 'ingredientName', 'kitchenCode', 'kitchenName', 'qty_sold']].copy()
-        records = records[records['qty_sold'] > 0]
+        
         # Strip whitespace from codes/names
         records['ingredientCode'] = records['ingredientCode'].str.strip()
         records['ingredientName'] = records['ingredientName'].str.strip()
@@ -223,13 +232,56 @@ def run():
         all_records.append(records)
         log.info(f"  {curr_date}: version {version_key} → {len(records):,} rows")
 
-        curr_date += timedelta(days=1)
+        # Save day-by-day
+        master_df = records.copy()
+        master_df = master_df.rename(columns={
+            'date_parsed': 'date',
+            'ingredientCode': 'sku_code',
+            'ingredientName': 'sku',
+            'kitchenCode': 'outlet_code',
+            'kitchenName': 'outlet'
+        })
+        master_df['date'] = pd.to_datetime(master_df['date']).dt.strftime('%Y-%m-%d')
+        master_df = master_df.groupby(["date", "sku_code", "outlet_code"], as_index=False).agg(
+            sku=("sku", "first"),
+            outlet=("outlet", "first"),
+            qty_sold=("qty_sold", "sum")
+        )
+        try:
+            import sys
+            if os.path.dirname(os.path.dirname(os.path.abspath(__file__))) not in sys.path:
+                sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+            from backend.database import get_db_connection
+            conn = get_db_connection()
+            cursor = conn.cursor()
+            inserted = 0
+            for _, row in master_df.iterrows():
+                try:
+                    cursor.execute("""
+                        INSERT INTO fact_daily_sales (date, sku, sku_code, outlet, outlet_code, qty_sold)
+                        VALUES (%s, %s, %s, %s, %s, %s)
+                        ON CONFLICT (date, sku_code, outlet_code) DO UPDATE SET
+                            qty_sold = EXCLUDED.qty_sold,
+                            sku = EXCLUDED.sku,
+                            outlet = EXCLUDED.outlet
+                    """, (row["date"], row["sku"], row["sku_code"], row["outlet"], row["outlet_code"], row["qty_sold"]))
+                    inserted += 1
+                except Exception as e:
+                    pass
+            conn.commit()
+            cursor.close()
+            conn.close()
+            log.info(f"  Saved {inserted} rows to DB for {curr_date}")
+        except Exception as e:
+            log.error(f"  Failed to save DB for {curr_date}: {e}")
+
+        curr_date -= timedelta(days=1)
 
     if not all_records:
         log.error("No data collected!")
         return
 
-    # Combine all days
+        # Combine all days
     master_df = pd.concat(all_records, ignore_index=True)
     master_df = master_df.rename(columns={
         'date_parsed': 'date',
@@ -246,8 +298,7 @@ def run():
         outlet=("outlet", "first"),
         qty_sold=("qty_sold", "sum")
     )
-    log.info(f"Total unique records after deduplication: {len(master_df):,}")
-
+    
     # Upsert into PostgreSQL
     try:
         import sys
@@ -256,7 +307,7 @@ def run():
         conn = get_db_connection()
         cursor = conn.cursor()
 
-        log.info("Uploading to fact_daily_sales ...")
+        log.info(f"Uploading {len(master_df)} rows to fact_daily_sales ...")
         inserted = 0
         for _, row in master_df.iterrows():
             try:
@@ -282,6 +333,7 @@ def run():
         fallback = os.path.join(os.path.dirname(os.path.abspath(__file__)), "supplynote_demand_backup.csv")
         master_df.to_csv(fallback, index=False)
         log.info(f"Saved to fallback CSV: {fallback}")
+
 
 
 if __name__ == "__main__":

@@ -37,8 +37,8 @@ def run(yesterday_only=False):
         log.info(f"Cron mode: Fetching only yesterday's data ({start_date.strftime('%Y-%m-%d')})")
     else:
         start_date = datetime(2026, 1, 1)
-        end_date = datetime(2026, 7, 14)
-        log.info(f"Historical mode: Fetching from {start_date.strftime('%Y-%m-%d')} to {end_date.strftime('%Y-%m-%d')}")
+        end_date = datetime.now()
+        log.info(f"Historical mode: Fetching backwards from {end_date.strftime('%Y-%m-%d')} down to {start_date.strftime('%Y-%m-%d')}")
     
     with sync_playwright() as p:
         browser = p.chromium.launch(headless=True, args=["--no-sandbox", "--disable-dev-shm-usage"])
@@ -65,8 +65,8 @@ def run(yesterday_only=False):
                 log.error("Login failed (timeout waiting for redirect).")
                 return
 
-            curr_date = start_date
-            while curr_date <= end_date:
+            curr_date = end_date
+            while curr_date >= start_date:
                 plan_date_utc = curr_date.strftime("%Y-%m-%dT18:30:00.000Z")
                 log.info(f"Processing date: {curr_date.strftime('%Y-%m-%d')}")
                 
@@ -82,13 +82,13 @@ def run(yesterday_only=False):
                 
                 if not versions:
                     log.warning(f"  No versions found for {curr_date.strftime('%Y-%m-%d')}.")
-                    curr_date += timedelta(days=1)
+                    curr_date -= timedelta(days=1)
                     continue
                 
                 version_key = versions[0].get("versionKey")
                 if not version_key:
                     log.warning(f"  Version key not found in data for {curr_date.strftime('%Y-%m-%d')}.")
-                    curr_date += timedelta(days=1)
+                    curr_date -= timedelta(days=1)
                     continue
                 
                 # Check if file already exists before doing slow API call
@@ -96,7 +96,7 @@ def run(yesterday_only=False):
                 existing = glob.glob(os.path.join(DROPZONE, f"CombinedIngredientsDemand_{version_key}_*.csv"))
                 if existing:
                     log.info(f"  File for {version_key} already exists ({os.path.basename(existing[0])}). Skipping.")
-                    curr_date += timedelta(days=1)
+                    curr_date -= timedelta(days=1)
                     continue
                 
                 # Fetch the S3 URL with aggressive retries
@@ -127,7 +127,7 @@ def run(yesterday_only=False):
                 
                 if not s3_url or s3_url in ['504', 'error']:
                     log.error(f"  Failed to get S3 URL for {curr_date.strftime('%Y-%m-%d')} after 5 attempts.")
-                    curr_date += timedelta(days=1)
+                    curr_date -= timedelta(days=1)
                     continue
                 
                 filename = s3_url.split('/')[-1].split('?')[0]
@@ -141,7 +141,7 @@ def run(yesterday_only=False):
                         if chunk: f.write(chunk)
                 log.info(f"  Downloaded successfully.")
                 
-                curr_date += timedelta(days=1)
+                curr_date -= timedelta(days=1)
                 time.sleep(2)  # brief pause before next day
                 
         except Exception as e:

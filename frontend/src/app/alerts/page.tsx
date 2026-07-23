@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react'
 import Layout from '@/components/Layout'
 import AlertBadge from '@/components/AlertBadge'
 import LoadingSpinner from '@/components/LoadingSpinner'
-import api from '@/lib/api'
+import { useCachedApi } from '@/hooks/useCachedApi'
 import { Clock, CheckCircle, RefreshCw, X } from 'lucide-react'
 import { formatDistanceToNow } from 'date-fns'
 import { clsx } from 'clsx'
@@ -22,30 +22,27 @@ interface Alert {
 }
 
 export default function AlertsPage() {
-  const [alerts,   setAlerts]   = useState<Alert[]>([])
-  const [loading,  setLoading]  = useState(true)
   const [severity, setSeverity] = useState('')
   const [showResolved, setShowResolved] = useState(false)
-
-  const fetchAlerts = async () => {
-    setLoading(true)
-    const params = new URLSearchParams({
-      resolved: String(showResolved)
-    })
-    const r = await api.get(`/api/alerts?${params}`).catch(() => ({ data: [] }))
-    setAlerts(r.data)
-    setLoading(false)
-  }
+  
+  const params = new URLSearchParams({ resolved: String(showResolved) }).toString()
+  const { data: cachedAlerts, loading, error, mutate } = useCachedApi<Alert[]>(`/api/alerts?${params}`)
+  const alerts = cachedAlerts || []
 
   useEffect(() => {
-    fetchAlerts()
-    const interval = setInterval(fetchAlerts, 5 * 60 * 1000)
+    const interval = setInterval(() => mutate(true), 5 * 60 * 1000)
     return () => clearInterval(interval)
-  }, [showResolved])
+  }, [mutate])
 
   const resolve = async (alertId: string) => {
-    await api.post(`/api/alerts/${alertId}/resolve`)
-    setAlerts(prev => prev.filter(a => a.alert_id !== alertId))
+    try {
+      // dynamic import api because we deleted the standard import
+      const api = (await import('@/lib/api')).default
+      await api.post(`/api/alerts/${alertId}/resolve`)
+      mutate(true)
+    } catch (e) {
+      console.error(e)
+    }
   }
 
   const severityBorder = (s: string) => ({

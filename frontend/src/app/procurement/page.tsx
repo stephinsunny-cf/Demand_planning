@@ -5,6 +5,8 @@ import Layout from '@/components/Layout'
 import ExportButton from '@/components/ExportButton'
 import LoadingSpinner from '@/components/LoadingSpinner'
 import api from '@/lib/api'
+import { getCached, setCached } from '@/lib/pageCache'
+import { useCachedApi } from '@/hooks/useCachedApi'
 import { ShoppingCart, Zap, IndianRupee, Users } from 'lucide-react'
 import { clsx } from 'clsx'
 
@@ -23,23 +25,14 @@ interface ProcRow {
 }
 
 export default function ProcurementPage() {
-  const [rows,    setRows]   = useState<ProcRow[]>([])
-  const [loading, setLoading]= useState(true)
   const [urgency, setUrgency]= useState('')
-
-  const fetchData = async (u = urgency) => {
-    setLoading(true)
-    const params = new URLSearchParams({ ...(u && { urgency: u }) })
-    const r = await api.get(`/api/procurement?${params}`).catch(() => ({ data: [] }))
-    setRows(r.data)
-    setLoading(false)
-  }
-
-  useEffect(() => { fetchData() }, [])
+  const params = new URLSearchParams({ ...(urgency && { urgency }) }).toString()
+  const { data: cachedRows, loading, error, mutate } = useCachedApi<ProcRow[]>(`/api/procurement?${params}`)
+  const rows = cachedRows || []
 
   const markOrdered = async (ingredient: string) => {
     await api.post(`/api/procurement/${encodeURIComponent(ingredient)}/mark_ordered`)
-    fetchData()
+    mutate(true)
   }
 
   // Group by vendor

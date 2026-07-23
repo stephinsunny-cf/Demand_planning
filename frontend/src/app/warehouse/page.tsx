@@ -6,24 +6,16 @@ import DataTable from '@/components/DataTable'
 import StatusPill from '@/components/StatusPill'
 import ExportButton from '@/components/ExportButton'
 import LoadingSpinner from '@/components/LoadingSpinner'
-import api from '@/lib/api'
+import { useCachedApi } from '@/hooks/useCachedApi'
 import { Package, AlertTriangle, CheckCircle, Clock } from 'lucide-react'
 
 export default function WarehousePage() {
-  const [rows,    setRows]   = useState<Record<string, unknown>[]>([])
-  const [loading, setLoading]= useState(true)
-  const [status,  setStatus] = useState('')
-  const [search,  setSearch] = useState('')
-
-  const fetchData = async (s = status) => {
-    setLoading(true)
-    const params = new URLSearchParams({ ...(s && { status: s }) })
-    const r = await api.get(`/api/warehouse?${params}`).catch(() => ({ data: [] }))
-    setRows(r.data)
-    setLoading(false)
-  }
-
-  useEffect(() => { fetchData() }, [])
+  const [status, setStatus] = useState('')
+  const [search, setSearch] = useState('')
+  
+  const params = new URLSearchParams({ ...(status && { status }) }).toString()
+  const { data: cachedRows, loading, error, mutate } = useCachedApi<Record<string, unknown>[]>(`/api/warehouse?${params}`)
+  const rows = cachedRows || []
 
   const counts = {
     total:  rows.length,

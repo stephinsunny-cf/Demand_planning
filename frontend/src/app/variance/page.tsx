@@ -4,40 +4,31 @@ import Layout from '@/components/Layout'
 import DatePicker from '@/components/DatePicker'
 import ExportButton from '@/components/ExportButton'
 import LoadingSpinner from '@/components/LoadingSpinner'
-import api from '@/lib/api'
+import { useCachedApi } from '@/hooks/useCachedApi'
 import { AlertTriangle, Info } from 'lucide-react'
 
 export default function VariancePage() {
-  const [rows, setRows] = useState<Record<string, unknown>[]>([])
-  const [loading, setLoading] = useState(true)
   const [startDate, setStartDate] = useState(() => {
     const d = new Date(); d.setDate(d.getDate() - 7); return d.toISOString().slice(0, 10)
   })
   const [endDate, setEndDate] = useState(new Date().toISOString().slice(0, 10))
   const [outlet, setOutlet] = useState('')
   const [ingredient, setIngredient] = useState('')
-
   const [view, setView] = useState<'variance' | 'unmapped'>('variance')
 
-  const fetchData = async () => {
-    setLoading(true)
-    const params = new URLSearchParams({
-      start_date: startDate,
-      end_date: endDate,
-      ...(outlet && { outlet }),
-      ...(ingredient && { ingredient }),
-    })
-    
-    try {
-      const resp = await api.get(`/api/variance?${params}`)
-      setRows(resp.data || [])
-    } catch (e) {
-      setRows([])
-    }
-    setLoading(false)
-  }
+  const params = new URLSearchParams({
+    start_date: startDate,
+    end_date: endDate,
+    ...(outlet && { outlet }),
+    ...(ingredient && { ingredient }),
+  }).toString()
 
-  useEffect(() => { fetchData() }, [])
+  const { data: cachedRows, loading, error, mutate } = useCachedApi<Record<string, unknown>[]>(`/api/variance?${params}`)
+  const rows = cachedRows || []
+
+  const fetchData = () => {
+    mutate(true)
+  }
 
   const filteredRows = rows.filter((r: any) => 
     view === 'unmapped' ? r.flag === 'unmapped' : r.flag !== 'unmapped'

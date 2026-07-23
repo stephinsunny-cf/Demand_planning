@@ -6,26 +6,16 @@ import DataTable from '@/components/DataTable'
 import StatusPill from '@/components/StatusPill'
 import ExportButton from '@/components/ExportButton'
 import LoadingSpinner from '@/components/LoadingSpinner'
-import api from '@/lib/api'
+import { useCachedApi } from '@/hooks/useCachedApi'
 import { Truck, AlertTriangle, CheckCircle, Clock } from 'lucide-react'
 
 export default function SupplyPage() {
-  const [allRows,  setAllRows] = useState<Record<string, unknown>[]>([])
-  const [loading,  setLoading] = useState(true)
-  const [kitchen,  setKitchen] = useState('')
-  const [status,   setStatus]  = useState('')
-  const [kitchens, setKitchens]= useState<string[]>([])
+  const [kitchen, setKitchen] = useState('')
+  const [status, setStatus] = useState('')
 
-  const fetchData = async () => {
-    setLoading(true)
-    const r = await api.get(`/api/supply`).catch(() => ({ data: [] }))
-    const data = r.data as Record<string, unknown>[]
-    setAllRows(data)
-    setKitchens([...new Set(data.map(d => String(d.kitchen)))].sort())
-    setLoading(false)
-  }
-
-  useEffect(() => { fetchData() }, [])
+  const { data: cachedRows, loading, error, mutate } = useCachedApi<Record<string, unknown>[]>('/api/supply')
+  const allRows = cachedRows || []
+  const kitchens = [...new Set(allRows.map(d => String(d.kitchen)))].sort()
 
   const counts = {
     RED:    allRows.filter(r => r.status === 'RED').length,

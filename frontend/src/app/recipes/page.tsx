@@ -5,6 +5,7 @@ import Layout from '@/components/Layout'
 import DataTable from '@/components/DataTable'
 import LoadingSpinner from '@/components/LoadingSpinner'
 import api from '@/lib/api'
+import { useCachedApi } from '@/hooks/useCachedApi'
 import { useRole } from '@/hooks/useRole'
 import { ChefHat, AlertTriangle, Edit2, X, Save } from 'lucide-react'
 
@@ -18,31 +19,20 @@ interface Recipe {
 }
 
 export default function RecipesPage() {
-  const [rows,      setRows]     = useState<Recipe[]>([])
-  const [loading,   setLoading]  = useState(true)
-  const [refreshing, setRefreshing] = useState(false)
-  const [search,    setSearch]   = useState('')
-  const [brand,     setBrand]    = useState('')
+  const [search, setSearch] = useState('')
+  const [brand, setBrand] = useState('')
   const [trackedOnly, setTrackedOnly] = useState(false)
-  const [editDish,  setEditDish] = useState<string | null>(null)
-  const [editRows,  setEditRows] = useState<Recipe[]>([])
-  const [brands,    setBrands]   = useState<string[]>([])
+  const [editDish, setEditDish] = useState<string | null>(null)
+  const [editRows, setEditRows] = useState<Recipe[]>([])
   const { canEdit } = useRole()
+  
+  const params = new URLSearchParams({ ...(brand && { brand }), ...(search && { dish_name: search }) }).toString()
+  const { data: cachedRows, loading, error, mutate } = useCachedApi<Recipe[]>(`/api/recipes?${params}`)
+  const rows = cachedRows || []
+  const refreshing = false
+  const brands = [...new Set(rows.map(d => d.brand).filter(Boolean))].sort()
 
-  const fetchData = async (silent = false) => {
-    if (silent) setRefreshing(true)
-    else setLoading(true)
-    const params = new URLSearchParams({ ...(brand && { brand }), ...(search && { dish_name: search }) })
-    const r = await api.get(`/api/recipes?${params}`).catch(() => null)
-    if (r) {
-      setRows(r.data)
-      setBrands([...new Set((r.data as Recipe[]).map(d => d.brand).filter(Boolean))].sort())
-    }
-    setLoading(false)
-    setRefreshing(false)
-  }
-
-  useEffect(() => { fetchData() }, [])
+  const fetchData = () => { mutate(true) }
 
   const openEdit = (dishName: string) => {
     setEditDish(dishName)
