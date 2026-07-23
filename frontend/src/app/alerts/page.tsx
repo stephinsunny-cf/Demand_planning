@@ -92,7 +92,7 @@ export default function AlertsPage() {
             />
             Show resolved
           </label>
-          <button onClick={fetchAlerts}
+          <button onClick={() => mutate(true)}
             className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-slate-100 dark:bg-slate-800 hover:bg-slate-700
                        text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:text-white text-sm border border-slate-300 dark:border-slate-700 transition-all">
             <RefreshCw size={13} />
