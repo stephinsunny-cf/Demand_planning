@@ -26,6 +26,10 @@ async def get_variance(
         else:
             settings[row['ingredient'].lower()] = {'green_threshold': float(row['green_threshold']), 'yellow_threshold': float(row['yellow_threshold'])}
 
+    # Fetch mapped ingredients from recipe_master
+    mapped_df = query_df("SELECT DISTINCT lower(ingredient) as ingredient FROM recipe_master")
+    mapped_ingredients = set(mapped_df['ingredient'].tolist()) if not mapped_df.empty else set()
+
     # Fetch fact_variance
     where = []
     if start_date and end_date:
@@ -75,7 +79,7 @@ async def get_variance(
         ing_name = r['ingredient'].lower()
         thresh = settings.get(ing_name, fallback)
         
-        if exp == 0 and act > 0:
+        if exp == 0 and act > 0 and ing_name not in mapped_ingredients:
             r['flag'] = 'unmapped'
             r['variance_pct'] = None
         else:
