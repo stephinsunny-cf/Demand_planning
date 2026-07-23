@@ -4,26 +4,15 @@ import Layout from '@/components/Layout'
 import DataTable from '@/components/DataTable'
 import LoadingSpinner from '@/components/LoadingSpinner'
 import api from '@/lib/api'
+import { useCachedApi } from '@/hooks/useCachedApi'
 import { Plus } from 'lucide-react'
 
 export default function TrackerPage() {
-  const [data, setData] = useState<Record<string, unknown>[]>([])
-  const [loading, setLoading] = useState(true)
   const [showAddModal, setShowAddModal] = useState(false)
   const [newItem, setNewItem] = useState({ code: '', ingredient: '', supply_mode: 'Inhouse', drr: 0, wh_sih: 0, open_po: 0, neworder: 0, lead_time_days: 7.0 })
 
-  const fetchData = async () => {
-    setLoading(true)
-    api.get('/api/tracker').then(r => {
-      setData(r.data)
-      setLoading(false)
-    }).catch(e => {
-      console.error(e)
-      setLoading(false)
-    })
-  }
-
-  useEffect(() => { fetchData() }, [])
+  const { data: cachedData, loading, error, mutate } = useCachedApi<Record<string, unknown>[]>('/api/tracker')
+  const data = cachedData || []
 
   const handleAdd = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -33,7 +22,7 @@ export default function TrackerPage() {
       await api.post('/api/tracker', newItem)
       setShowAddModal(false)
       setNewItem({ code: '', ingredient: '', supply_mode: 'Inhouse', drr: 0, wh_sih: 0, open_po: 0, neworder: 0, lead_time_days: 7.0 })
-      fetchData()
+      mutate(true)
     } catch (e) {
       alert('Error adding item')
       console.error(e)
@@ -43,7 +32,7 @@ export default function TrackerPage() {
   const handleUpdateLeadTime = async (ingredient: string, newLeadTime: number) => {
     try {
       await api.put(`/api/tracker/${encodeURIComponent(ingredient)}/lead_time`, { lead_time_days: newLeadTime })
-      fetchData() // Refresh
+      mutate(true) // Refresh
     } catch (e) {
       alert('Failed to update lead time')
     }

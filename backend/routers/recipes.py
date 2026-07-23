@@ -20,7 +20,7 @@ class RecipeUpdateItem(BaseModel):
 @router.get("/recipes")
 async def get_recipes(
     dish_name: Optional[str] = Query(default=None),
-    user: UserContext = Depends(require_role("super_admin", "planning_manager", "culinary_team")),
+    user: UserContext = Depends(require_role("reader", "editor", "admin", "super_admin")),
 ):
     where = ["1=1"]
     if dish_name: where.append(f"lower(dish_name) LIKE lower('%{dish_name}%')")
@@ -49,7 +49,7 @@ async def get_recipes(
 async def update_recipe(
     dish_name: str,
     items: list[RecipeUpdateItem],
-    user: UserContext = Depends(require_role("super_admin", "culinary_team")),
+    user: UserContext = Depends(require_role("editor", "admin", "super_admin")),
 ):
     """Update recipe ingredients for a dish."""
     import psycopg2

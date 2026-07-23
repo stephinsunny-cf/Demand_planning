@@ -1,6 +1,6 @@
 // src/app/forecast/page.tsx
 'use client'
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import Layout from '@/components/Layout'
 import DataTable from '@/components/DataTable'
 import ExportButton from '@/components/ExportButton'
@@ -8,10 +8,12 @@ import MultiSelect from '@/components/MultiSelect'
 import SingleSelect from '@/components/SingleSelect'
 import LoadingSpinner from '@/components/LoadingSpinner'
 import api from '@/lib/api'
+import { getCached, setCached } from '@/lib/pageCache'
+import { useCachedApi } from '@/hooks/useCachedApi'
+
+type ForecastRow = Record<string, unknown>
 
 export default function ForecastPage() {
-  const [allForecasts,      setAllForecasts]    = useState<Record<string, unknown>[]>([])
-  
   // Filter lists from API
   const [allLocations,      setAllLocations]      = useState<string[]>([])
   const [locationOutlets,   setLocationOutlets]   = useState<Record<string, string[]>>({})
@@ -21,50 +23,48 @@ export default function ForecastPage() {
   const [selectedOutlets,   setSelectedOutlets]   = useState<string[]>([])
   const [skuSearch,         setSkuSearch]         = useState('')
   const [forecastDays,      setForecastDays]      = useState(7)
-  const [isLoading,         setIsLoading]         = useState(true)
 
-  // Load filter metadata
+  // Load filter metadata (cached separately)
   useEffect(() => {
-    api.get('/api/forecast/filters').then(r => {
-      const data = r.data as { city: string, outlets: string[] }[]
+    const FILTER_KEY = 'forecast:filters'
+    const cachedFilters = getCached<{ city: string; outlets: string[] }[]>(FILTER_KEY)
+    const applyFilters = (data: { city: string; outlets: string[] }[]) => {
       const locs = data.map(d => d.city).filter(Boolean).sort()
       const outMap: Record<string, string[]> = {}
-      data.forEach(d => {
-        if (d.city) outMap[d.city] = d.outlets.sort()
-      })
+      data.forEach(d => { if (d.city) outMap[d.city] = d.outlets.sort() })
       setAllLocations(locs)
       setLocationOutlets(outMap)
+    }
+    if (cachedFilters) applyFilters(cachedFilters)
+    api.get('/api/forecast/filters').then(r => {
+      const data = r.data as { city: string; outlets: string[] }[]
+      setCached(FILTER_KEY, data)
+      applyFilters(data)
     }).catch(console.error)
   }, [])
 
-  const fetchData = () => {
-    setIsLoading(true)
-    const params = new URLSearchParams()
-    if (selectedLocations.length > 0) params.set('locations', selectedLocations.join(','))
-    if (selectedOutlets.length > 0) params.set('outlets', selectedOutlets.join(','))
-    params.set('days', forecastDays.toString())
-    
-    api.get(`/api/forecast/all?${params}`).then(r => {
-      const rows = r.data as Record<string, unknown>[]
-      const totalVolume = rows.reduce((sum, row) => sum + Number(row.total_predicted || 0), 0)
-      const enrichedRows = rows.map(row => ({
-        ...row,
-        display_sku: row.sku_code ? `${row.sku} (${row.sku_code})` : row.sku,
-        location: row.mapped_city ? String(row.mapped_city) : String(row.outlet).split(' - ')[0].trim(),
-        percentage: totalVolume > 0
-          ? ((Number(row.total_predicted) / totalVolume) * 100).toFixed(2)
-          : '0.00',
-      }))
-      setAllForecasts(enrichedRows)
-      setIsLoading(false)
-    }).catch(e => {
-      console.error(e)
-      setIsLoading(false)
-    })
+  const enrichRows = (rows: ForecastRow[]): ForecastRow[] => {
+    const totalVolume = rows.reduce((sum, row) => sum + Number(row.total_predicted || 0), 0)
+    return rows.map(row => ({
+      ...row,
+      display_sku: row.sku_code ? `${row.sku} (${row.sku_code})` : row.sku,
+      location: row.mapped_city ? String(row.mapped_city) : String(row.outlet).split(' - ')[0].trim(),
+      percentage: totalVolume > 0
+        ? ((Number(row.total_predicted) / totalVolume) * 100).toFixed(2)
+        : '0.00',
+    }))
   }
 
-  // Load initial data and auto-reload on forecastDays change
-  useEffect(() => { fetchData() }, [forecastDays])
+  const params = new URLSearchParams()
+  if (selectedLocations.length > 0) params.set('locations', selectedLocations.join(','))
+  if (selectedOutlets.length > 0) params.set('outlets', selectedOutlets.join(','))
+  params.set('days', forecastDays.toString())
+
+  const { data: rawRows, loading: isLoading, error, mutate } = useCachedApi<ForecastRow[]>(`/api/forecast/all?${params.toString()}`)
+  const allForecasts = rawRows ? enrichRows(rawRows) : []
+  const isRefreshing = false
+
+  const fetchData = () => { mutate(true) }
 
   // Derived outlets for cascaded filter
   const outletsForLocation = selectedLocations.length === 0

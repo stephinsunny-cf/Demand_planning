@@ -7,15 +7,11 @@ import DatePicker from '@/components/DatePicker'
 import DataTable from '@/components/DataTable'
 import ExportButton from '@/components/ExportButton'
 import LoadingSpinner from '@/components/LoadingSpinner'
-import api from '@/lib/api'
+import { useCachedApi } from '@/hooks/useCachedApi'
 import { IndianRupee, ShoppingBag, Layers, Activity, AlertTriangle } from 'lucide-react'
 
 export default function SalesPage() {
-  const [tab, setTab] = useState<'pos' | 'consumption'>('pos')
-  const [summary, setSummary] = useState<Record<string, unknown>>({})
-  const [rows, setRows] = useState<Record<string, unknown>[]>([])
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState(false)
+  const [tab, setTab] = useState<'consumption' | 'pos'>('consumption')
   const [startDate, setStartDate] = useState(() => {
     const d = new Date(); d.setDate(d.getDate() - 30); return d.toISOString().slice(0, 10)
   })
@@ -23,34 +19,27 @@ export default function SalesPage() {
   const [brand, setBrand] = useState('')
   const [sku, setSku] = useState('')
 
-  const fetchData = async () => {
-    setLoading(true)
-    setError(false)
-    const params = new URLSearchParams({
-      start_date: startDate,
-      end_date: endDate,
-      ...(brand && { brand }),
-      ...(sku && { sku }),
-    })
-    
-    const endpointPrefix = tab === 'pos' ? '/api/sales/pos' : '/api/sales'
-    
-    try {
-      const [summaryResp, rowsResp] = await Promise.all([
-        api.get(`${endpointPrefix}/summary?${params}`),
-        api.get(`${endpointPrefix}?${params}`),
-      ])
-      
-      setSummary(summaryResp.data)
-      setRows(rowsResp.data)
-    } catch (e) {
-      setError(true)
-    } finally {
-      setLoading(false)
-    }
+  const params = new URLSearchParams({
+    start_date: startDate,
+    end_date: endDate,
+    ...(brand && { brand }),
+    ...(sku && { sku }),
+  }).toString()
+  
+  const endpointPrefix = tab === 'pos' ? '/api/sales/pos' : '/api/sales'
+  
+  const { data: summaryData, loading: summaryLoading, error: summaryError, mutate: mutateSummary } = useCachedApi<Record<string, unknown>>(`${endpointPrefix}/summary?${params}`)
+  const { data: rowsData, loading: rowsLoading, error: rowsError, mutate: mutateRows } = useCachedApi<Record<string, unknown>[]>(`${endpointPrefix}?${params}`)
+
+  const handleApply = () => {
+    mutateSummary(true)
+    mutateRows(true)
   }
 
-  useEffect(() => { fetchData() }, [tab]) // Refetch on tab change
+  const loading = summaryLoading || rowsLoading
+  const error = summaryError || rowsError
+  const summary = summaryData || {}
+  const rows = rowsData || []
 
   const posColumns = [
     { key: 'outlet', label: 'Outlet', sortable: true },
@@ -75,16 +64,16 @@ export default function SalesPage() {
       {/* Tab Switcher */}
       <div className="flex gap-4 mb-6 border-b border-slate-200 dark:border-slate-800 pb-2">
         <button
-          onClick={() => setTab('pos')}
-          className={`pb-2 px-1 font-medium transition-colors ${tab === 'pos' ? 'text-emerald-500 border-b-2 border-emerald-500' : 'text-slate-500 hover:text-slate-700 dark:hover:text-slate-300'}`}
-        >
-          POS Revenue (UrbanPiper)
-        </button>
-        <button
           onClick={() => setTab('consumption')}
           className={`pb-2 px-1 font-medium transition-colors ${tab === 'consumption' ? 'text-emerald-500 border-b-2 border-emerald-500' : 'text-slate-500 hover:text-slate-700 dark:hover:text-slate-300'}`}
         >
           Kitchen Consumption (SupplyNote)
+        </button>
+        <button
+          onClick={() => setTab('pos')}
+          className={`pb-2 px-1 font-medium transition-colors ${tab === 'pos' ? 'text-emerald-500 border-b-2 border-emerald-500' : 'text-slate-500 hover:text-slate-700 dark:hover:text-slate-300'}`}
+        >
+          Dish Sales (UrbanPiper)
         </button>
       </div>
 
@@ -103,7 +92,7 @@ export default function SalesPage() {
              className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-lg px-3 py-2 text-sm text-slate-700 dark:text-slate-200 placeholder-slate-600 focus:outline-none focus:border-emerald-500 w-36" />
         </div>
         <div className="flex flex-col gap-1.5 self-end">
-           <button onClick={fetchData}
+           <button onClick={handleApply}
              className="px-4 py-2 rounded-lg bg-emerald-500 hover:bg-emerald-400 text-white text-sm font-medium transition-colors h-9">
              Apply
            </button>

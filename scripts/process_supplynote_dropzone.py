@@ -104,8 +104,8 @@ def run():
             for _, row in unique_combos.iterrows():
                 kitchen_ingredient_mapping.add((row[outlet_col], row[sku_col]))
 
-            # Filter non-zero demand (!= 0 allows negatives to pass through)
-            df_facts = df[df[qty_col] != 0].copy()
+            # Keep ALL rows, including zeroes, as requested by the business logic
+            df_facts = df.copy()
             
             if len(df_facts) > 0:
                 rename_map = {date_col: 'date', sku_col: 'sku', outlet_col: 'outlet', qty_col: 'qty_sold'}
@@ -237,16 +237,13 @@ def run():
 
         log.info("Database load complete!")
 
-        # 3. Archive the processed files so they aren't reprocessed tomorrow
-        import shutil
-        archive_dir = os.path.join(dropzone_dir, "archive")
-        os.makedirs(archive_dir, exist_ok=True)
+        # 3. Permanently delete the processed files so they aren't reprocessed
         for f in csv_files:
             try:
-                shutil.move(f, os.path.join(archive_dir, os.path.basename(f)))
+                os.remove(f)
             except Exception as e:
-                log.warning(f"Could not move {f} to archive: {e}")
-        log.info(f"Archived {len(csv_files)} files.")
+                log.warning(f"Could not delete {f}: {e}")
+        log.info(f"Permanently deleted {len(csv_files)} processed files.")
 
     except Exception as e:
         log.error(f"Database operation failed: {e}")
