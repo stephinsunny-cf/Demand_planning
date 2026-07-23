@@ -14,7 +14,6 @@ export default function VariancePage() {
   const [endDate, setEndDate] = useState(new Date().toISOString().slice(0, 10))
   const [outlet, setOutlet] = useState('')
   const [ingredient, setIngredient] = useState('')
-  const [view, setView] = useState<'variance' | 'unmapped'>('variance')
 
   const params = new URLSearchParams({
     start_date: startDate,
@@ -30,9 +29,7 @@ export default function VariancePage() {
     mutate(true)
   }
 
-  const filteredRows = rows.filter((r: any) => 
-    view === 'unmapped' ? r.flag === 'unmapped' : r.flag !== 'unmapped'
-  )
+
 
   return (
     <Layout title="Variance Analysis (Wastage)">
@@ -50,20 +47,6 @@ export default function VariancePage() {
 
       {/* Filters & View Toggle */}
       <div className="flex flex-col gap-4 mb-6 card p-4 rounded-xl relative z-40">
-        <div className="flex gap-4 border-b border-slate-200 dark:border-slate-800 pb-2">
-          <button
-            onClick={() => setView('variance')}
-            className={`pb-2 px-1 font-medium transition-colors ${view === 'variance' ? 'text-emerald-500 border-b-2 border-emerald-500' : 'text-slate-500 hover:text-slate-700 dark:hover:text-slate-300'}`}
-          >
-            Genuine Variance
-          </button>
-          <button
-            onClick={() => setView('unmapped')}
-            className={`pb-2 px-1 font-medium transition-colors ${view === 'unmapped' ? 'text-amber-500 border-b-2 border-amber-500' : 'text-slate-500 hover:text-slate-700 dark:hover:text-slate-300'}`}
-          >
-            Needs Recipe Mapping
-          </button>
-        </div>
         <div className="flex flex-wrap items-center gap-3">
           <DatePicker label="From" value={startDate} onChange={setStartDate} />
           <DatePicker label="To" value={endDate} onChange={setEndDate} />
@@ -106,10 +89,10 @@ export default function VariancePage() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-200 dark:divide-slate-800 bg-white dark:bg-slate-950">
-                {filteredRows.length === 0 ? (
+                {rows.length === 0 ? (
                   <tr><td colSpan={8} className="px-6 py-8 text-center text-slate-500">No records found for this view.</td></tr>
                 ) : (
-                  filteredRows.map((row: any, i: number) => {
+                  rows.map((row: any, i: number) => {
                     const isRed = row.flag === 'red'
                     const isYellow = row.flag === 'yellow'
                     const isGreen = row.flag === 'green'
