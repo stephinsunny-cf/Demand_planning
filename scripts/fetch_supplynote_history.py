@@ -299,40 +299,10 @@ def run():
         qty_sold=("qty_sold", "sum")
     )
     
-    # Upsert into PostgreSQL
-    try:
-        import sys
-        sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-        from backend.database import get_db_connection
-        conn = get_db_connection()
-        cursor = conn.cursor()
+    # Bypassed slow DB insert. Files are saved to dropzone.
+    log.info("Finished downloading all CSV files to supplynote_dropzone! Run process_supplynote_dropzone.py to ingest.")
 
-        log.info(f"Uploading {len(master_df)} rows to fact_daily_sales ...")
-        inserted = 0
-        for _, row in master_df.iterrows():
-            try:
-                cursor.execute("""
-                    INSERT INTO fact_daily_sales (date, sku, sku_code, outlet, outlet_code, qty_sold)
-                    VALUES (%s, %s, %s, %s, %s, %s)
-                    ON CONFLICT (date, sku_code, outlet_code) DO UPDATE SET
-                        qty_sold = EXCLUDED.qty_sold,
-                        sku = EXCLUDED.sku,
-                        outlet = EXCLUDED.outlet
-                """, (row["date"], row["sku"], row["sku_code"], row["outlet"], row["outlet_code"], row["qty_sold"]))
-                inserted += 1
-            except Exception as e:
-                log.warning(f"DB Insert error: {e}")
-
-        conn.commit()
-        cursor.close()
-        conn.close()
-        log.info(f"Done! Upserted {inserted:,} records into PostgreSQL.")
-
-    except Exception as e:
-        log.error(f"DB connection failed: {e}")
-        fallback = os.path.join(os.path.dirname(os.path.abspath(__file__)), "supplynote_demand_backup.csv")
-        master_df.to_csv(fallback, index=False)
-        log.info(f"Saved to fallback CSV: {fallback}")
+    pass
 
 
 

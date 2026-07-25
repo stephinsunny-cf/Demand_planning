@@ -196,13 +196,13 @@ def run() -> pd.DataFrame:
             
         max_date = max_date_df.iloc[0]["max_date"]
 
-        # Load historical sales (limit to last 40 days of available data)
         # ONLY load SKUs that are tracked in the procurement_tracker (the 138 items)
+        # We now match and propagate the CODE instead of the name
         sales_df = query_df(f"""
-            SELECT date, sku, outlet, qty_sold 
+            SELECT date, sku_code AS sku, outlet, qty_sold 
             FROM fact_daily_sales
-            WHERE date >= DATE '{max_date}' - INTERVAL '40 days'
-              AND sku IN (SELECT code FROM procurement_tracker)
+            WHERE date >= DATE '{max_date}' - INTERVAL '365 days'
+              AND sku_code IN (SELECT code FROM procurement_tracker)
         """)
 
         if sales_df.empty:

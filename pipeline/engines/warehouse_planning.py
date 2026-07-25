@@ -95,10 +95,10 @@ def run(ingredient_demand: pd.DataFrame = None) -> pd.DataFrame:
                 stock_agg["status"] = "GREEN"
             return stock_agg
 
-        # Normalise ingredient names for join
+        # Normalise ingredient codes for join (strip whitespace)
         ingredient_demand = ingredient_demand.copy()
-        ingredient_demand["ingredient"] = ingredient_demand["ingredient"].astype(str).str.strip().str.lower()
-        stock_agg["ingredient"] = stock_agg["ingredient"].astype(str).str.strip().str.lower()
+        ingredient_demand["ingredient"] = ingredient_demand["ingredient"].astype(str).str.strip()
+        stock_agg["ingredient"] = stock_agg["ingredient"].astype(str).str.strip()
 
         # Merge demand with warehouse stock
         report = ingredient_demand.merge(

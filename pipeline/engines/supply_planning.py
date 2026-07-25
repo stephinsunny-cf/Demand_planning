@@ -58,17 +58,18 @@ def run() -> pd.DataFrame:
         )
 
         # Dynamic Lead Time settings from Procurement Tracker
+        # Match on code since all fact tables now use code
         safety_df = query_df(
-            "SELECT lower(code) AS sku, lead_time_days AS safety_stock_days "
+            "SELECT code AS sku, lead_time_days AS safety_stock_days "
             "FROM procurement_tracker"
         )
 
         # Average daily sales for safety stock calculation
         avg_sales_df = query_df(
-            "SELECT sku, outlet, avg(qty_sold) AS avg_daily_qty "
+            "SELECT sku_code AS sku, outlet, avg(qty_sold) AS avg_daily_qty "
             "FROM fact_daily_sales "
             f"WHERE date >= '{today - timedelta(days=28)}' "
-            "GROUP BY sku, outlet"
+            "GROUP BY sku_code, outlet"
         )
 
         if forecast_df.empty:

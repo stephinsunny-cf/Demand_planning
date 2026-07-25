@@ -28,17 +28,17 @@ async def get_supply_plan(
 
     # 3-day ingredient demand per kitchen
     fore_df = query_df(f"""
-        SELECT f.ingredient AS sku, f.outlet AS kitchen,
+        SELECT f.ingredient AS sku_code, d.sku_name AS sku, f.outlet AS kitchen,
                sum(f.total_qty_needed) AS forecast_3day
         FROM fact_ingredient_demand f
-        JOIN procurement_tracker pt ON lower(f.ingredient) = lower(pt.code)
+        JOIN dim_sku d ON f.ingredient = d.sku_code
         WHERE f.forecast_date >= '{today}' AND f.forecast_date <= '{in_3d}'
-        GROUP BY f.ingredient, f.outlet
+        GROUP BY f.ingredient, d.sku_name, f.outlet
     """)
 
     # Latest kitchen stock
     stock_df = query_df("""
-        SELECT kitchen, ingredient AS sku, sum(qty_available) AS stock_qty
+        SELECT kitchen, ingredient AS sku_code, sum(qty_available) AS stock_qty
         FROM fact_kitchen_stock
         WHERE (kitchen, ingredient, snapshot_date) IN (
           SELECT kitchen, ingredient, max(snapshot_date)
@@ -58,7 +58,7 @@ async def get_supply_plan(
     import pandas as pd
     plan = fore_df.copy()
     if not stock_df.empty:
-        plan = plan.merge(stock_df, on=["sku", "kitchen"], how="left")
+        plan = plan.merge(stock_df, on=["kitchen", "sku_code"], how="left")
     else:
         plan["stock_qty"] = 0.0
     plan["stock_qty"] = plan["stock_qty"].fillna(0.0)

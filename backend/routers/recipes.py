@@ -32,10 +32,11 @@ async def get_recipes(
             r.qty_per_unit AS qty_per_portion, 
             r.unit, 
             1.0 AS yield_factor,
-            pt.code as sku_code,
-            CASE WHEN pt.ingredient IS NOT NULL THEN true ELSE false END as is_tracked
+            d.sku_code,
+            d.sku_name,
+            CASE WHEN d.sku_code IS NOT NULL THEN true ELSE false END as is_tracked
         FROM recipe_master r
-        LEFT JOIN procurement_tracker pt ON r.ingredient = pt.code
+        LEFT JOIN dim_sku d ON lower(r.ingredient) = lower(d.sku_name)
         WHERE {' AND '.join(where)}
         ORDER BY r.dish_name, r.ingredient
         LIMIT 2000

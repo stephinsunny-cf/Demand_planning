@@ -83,13 +83,14 @@ def run() -> list:
                     ORDER BY kitchen, ingredient, snapshot_date DESC
                 ),
                 active_outlets AS (
-                    SELECT DISTINCT outlet, sku
+                    SELECT DISTINCT outlet, sku_code AS sku
                     FROM fact_daily_sales
                     WHERE date >= (SELECT MAX(date) FROM fact_daily_sales) - INTERVAL '14 days'
                 )
-                SELECT ls.kitchen, ls.ingredient, ls.qty_available
+                SELECT ls.kitchen, d.sku_name AS ingredient, ls.qty_available
                 FROM latest_stock ls
-                JOIN active_outlets ao ON lower(ls.kitchen) = lower(ao.outlet) AND lower(ls.ingredient) = lower(ao.sku)
+                JOIN active_outlets ao ON lower(ls.kitchen) = lower(ao.outlet) AND ls.ingredient = ao.sku
+                JOIN dim_sku d ON ls.ingredient = d.sku_code
                 WHERE ls.qty_available <= 0
             """)
             if not kitchen_zero.empty:
@@ -107,19 +108,20 @@ def run() -> list:
         try:
             in_3_days = today + timedelta(days=3)
             demand_df = query_df(f"""
-                SELECT ingredient, sum(total_qty_needed) AS demand_3day
-                FROM fact_ingredient_demand
-                WHERE forecast_date >= '{today}' AND forecast_date <= '{in_3_days}'
-                GROUP BY ingredient
+                SELECT f.ingredient AS sku_code, d.sku_name AS ingredient, sum(f.total_qty_needed) AS demand_3day
+                FROM fact_ingredient_demand f
+                JOIN dim_sku d ON f.ingredient = d.sku_code
+                WHERE f.forecast_date >= '{today}' AND f.forecast_date <= '{in_3_days}'
+                GROUP BY f.ingredient, d.sku_name
             """)
             wh_stock_df = query_df("""
-                SELECT ingredient, sum(qty_available) AS stock_qty
+                SELECT ingredient AS sku_code, sum(qty_available) AS stock_qty
                 FROM fact_kitchen_stock
                 WHERE (lower(kitchen) LIKE '%warehouse%' OR lower(kitchen) LIKE '%_wh%')
                 GROUP BY ingredient
             """)
             if not demand_df.empty and not wh_stock_df.empty:
-                wh_check = demand_df.merge(wh_stock_df, on="ingredient", how="inner")
+                wh_check = demand_df.merge(wh_stock_df, on="sku_code", how="inner")
                 critical = wh_check[wh_check["stock_qty"] < 0.1 * wh_check["demand_3day"]]
                 for _, r in critical.iterrows():
                     if is_new("WH_CRITICAL_LOW", ingredient=r["ingredient"]):

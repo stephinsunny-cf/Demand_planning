@@ -259,13 +259,13 @@ def run():
         log.error("METABASE_API_KEY is not set. Aborting.")
         return
 
+    from dateutil import parser as dt_parser
+    
     today     = datetime.now(IST).replace(hour=0, minute=0, second=0, microsecond=0)
-    yesterday = today - timedelta(days=1)
-    start_dt  = yesterday.strftime("%Y-%m-%d %H:%M:%S")
     end_dt    = today.strftime("%Y-%m-%d %H:%M:%S")
 
     log.info("=" * 65)
-    log.info("UrbanPiper Daily Sync  |  window: %s → %s", start_dt, end_dt)
+    log.info("UrbanPiper Daily Sync  |  Up to: %s", end_dt)
     log.info("=" * 65)
 
     conn       = get_pg_conn()
@@ -287,11 +287,25 @@ def run():
         log.info("  Metabase latest : %s", mb_max or "unknown")
         log.info("  PostgreSQL latest: %s", pg_max or "nothing yet")
 
-        if mb_max and pg_max and mb_max <= pg_max:
+        mb_dt = None
+        pg_dt = None
+        if mb_max:
+            try: mb_dt = dt_parser.parse(mb_max)
+            except: pass
+        if pg_max:
+            try: pg_dt = dt_parser.parse(pg_max)
+            except: pass
+
+        if mb_dt and pg_dt and mb_dt <= pg_dt:
             log.info("  No new data detected — skipping download.")
             continue
 
         log.info("  New data detected! Downloading...")
+
+        if pg_dt:
+            start_dt = (pg_dt - timedelta(days=1)).strftime("%Y-%m-%d %H:%M:%S")
+        else:
+            start_dt = (today - timedelta(days=1)).strftime("%Y-%m-%d %H:%M:%S")
 
         # ── Fetch ─────────────────────────────────────────────────────────
         df = fetch_from_metabase(tbl["source"], tbl["date_col"], start_dt, end_dt)

@@ -71,19 +71,19 @@ def ensure_tables(cursor):
         );
         CREATE TABLE IF NOT EXISTS fact_kitchen_stock (
             snapshot_date DATE,
-            kitchen VARCHAR,
-            ingredient VARCHAR,
+            kitchen       VARCHAR,
+            ingredient    VARCHAR,
             qty_available NUMERIC,
-            unit VARCHAR,
+            unit          VARCHAR,
             PRIMARY KEY (snapshot_date, kitchen, ingredient)
         );
         CREATE TABLE IF NOT EXISTS fact_daily_sales (
-            date               DATE,
-            sku                VARCHAR,
-            outlet             VARCHAR,
-            qty_sold           NUMERIC,
+            date                DATE,
+            sku                 VARCHAR,
+            outlet              VARCHAR,
+            qty_sold            NUMERIC,
             currently_available NUMERIC,
-            oos                VARCHAR,
+            oos                 VARCHAR,
             PRIMARY KEY (date, sku, outlet)
         );
     """)
@@ -92,6 +92,11 @@ def ensure_tables(cursor):
         ALTER TABLE fact_daily_sales
             ADD COLUMN IF NOT EXISTS currently_available NUMERIC,
             ADD COLUMN IF NOT EXISTS oos VARCHAR;
+    """)
+    # Change 1: Add outlet_code column to fact_kitchen_stock for code-based joining
+    cursor.execute("""
+        ALTER TABLE fact_kitchen_stock
+            ADD COLUMN IF NOT EXISTS outlet_code TEXT;
     """)
 
 
@@ -150,22 +155,29 @@ def clean_dataframe(df):
 
     # ── facts: drop zero demand ───────────────────────────────────────────────
     df_facts = df[df[qty_col] != 0].copy()
-    rename   = {date_col: "date", sku_col: "sku", outlet_col: "outlet", qty_col: "qty_sold"}
+    rename   = {date_col: "date", sku_col: "sku_code", outlet_col: "outlet_code", qty_col: "qty_sold"}
+    if sku_name_c in df_facts.columns: rename[sku_name_c] = "sku"
+    if outlet_nc in df_facts.columns: rename[outlet_nc] = "outlet"
     if avail_col: rename[avail_col] = "currently_available"
     if oos_col:   rename[oos_col]   = "oos"
     df_facts = df_facts.rename(columns=rename)
     df_facts["date"] = pd.to_datetime(df_facts["date"], dayfirst=True, errors="coerce")
 
-    keep = ["date", "sku", "outlet", "qty_sold"]
+    keep = ["date", "sku_code", "outlet_code", "qty_sold"]
+    if "sku" in df_facts.columns: keep.append("sku")
+    if "outlet" in df_facts.columns: keep.append("outlet")
     if avail_col: keep.append("currently_available")
     if oos_col:   keep.append("oos")
     df_facts = df_facts[keep]
+    
+    if "sku" not in df_facts.columns: df_facts["sku"] = ""
+    if "outlet" not in df_facts.columns: df_facts["outlet"] = ""
 
     # ── deduplicate ───────────────────────────────────────────────────────────
-    agg = {"qty_sold": "sum"}
+    agg = {"qty_sold": "sum", "sku": "first", "outlet": "first"}
     if "currently_available" in df_facts.columns: agg["currently_available"] = "first"
     if "oos"                 in df_facts.columns: agg["oos"]                 = "first"
-    df_facts = df_facts.groupby(["date", "sku", "outlet"], as_index=False).agg(agg)
+    df_facts = df_facts.groupby(["date", "sku_code", "outlet_code"], as_index=False).agg(agg)
 
     return df_facts, dim_ingredients, dim_outlets, mapping
 
@@ -216,15 +228,18 @@ def upsert_to_db(df_facts, dim_ingredients, dim_outlets, mapping):
                 if pd.isna(oos): oos = None
                 fact_data.append((
                     row["date"].strftime("%Y-%m-%d"),
-                    row["sku"], row["outlet"],
+                    row.get("sku", ""), row["sku_code"],
+                    row.get("outlet", ""), row["outlet_code"],
                     row["qty_sold"], avail, oos
                 ))
 
             if fact_data:
                 execute_values(cursor, """
-                    INSERT INTO fact_daily_sales (date, sku, outlet, qty_sold, currently_available, oos)
+                    INSERT INTO fact_daily_sales (date, sku, sku_code, outlet, outlet_code, qty_sold, currently_available, oos)
                     VALUES %s
-                    ON CONFLICT (date, sku, outlet) DO UPDATE SET
+                    ON CONFLICT (date, sku_code, outlet_code) DO UPDATE SET
+                        sku=EXCLUDED.sku,
+                        outlet=EXCLUDED.outlet,
                         qty_sold=EXCLUDED.qty_sold,
                         currently_available=EXCLUDED.currently_available,
                         oos=EXCLUDED.oos
@@ -269,6 +284,7 @@ def sync_stock_via_playwright(page):
                             let stock = item.currentStock !== undefined ? item.currentStock : (item.stock !== undefined ? item.stock : (item.physicalStock || 0));
                             parsed.push({
                                 outlet: out.name || out.outletName || out._id,
+                                outlet_code: out._id,
                                 sku: item.product.skuProductCode || item.product._id,
                                 qty_available: parseFloat(stock) || 0.0,
                                 unit: item.product.baseUnit || 'piece'
@@ -306,26 +322,44 @@ def upsert_stock_to_db(stock_list):
     try:
         ensure_tables(cursor)
         
-        # Filter out ingredients we don't care about (reduces 600k rows to ~10k)
+        # Filter to only the 138 tracked SKUs from procurement_tracker
         cursor.execute("SELECT code FROM procurement_tracker")
         tracked_skus = {row[0] for row in cursor.fetchall()}
         filtered_stock_list = [s for s in stock_list if s['sku'] in tracked_skus]
         
         today = datetime.now().strftime("%Y-%m-%d")
         fact_data = [
-            (today, s['outlet'], s['sku'], s['qty_available'], s['unit'])
+            (today, s['outlet'], s['sku'], s['qty_available'], s['unit'],
+             s.get('outlet_code', None))
             for s in filtered_stock_list
         ]
         
         if fact_data:
             execute_values(cursor, """
-                INSERT INTO fact_kitchen_stock (snapshot_date, kitchen, ingredient, qty_available, unit)
+                INSERT INTO fact_kitchen_stock (snapshot_date, kitchen, ingredient, qty_available, unit, outlet_code)
                 VALUES %s
                 ON CONFLICT (snapshot_date, kitchen, ingredient) DO UPDATE SET
                     qty_available = EXCLUDED.qty_available,
-                    unit = EXCLUDED.unit
+                    unit          = EXCLUDED.unit,
+                    outlet_code   = EXCLUDED.outlet_code
             """, fact_data, page_size=10000)
             log.info(f"Upserted {len(fact_data)} rows into fact_kitchen_stock.")
+
+        # Change 4: Upsert dim_outlet with outlet_code + outlet_name pairs seen
+        outlet_pairs = list({
+            (s.get('outlet_code'), s['outlet'])
+            for s in filtered_stock_list
+            if s.get('outlet_code')
+        })
+        if outlet_pairs:
+            execute_values(cursor, """
+                INSERT INTO dim_outlet (outlet_code, outlet_name)
+                VALUES %s
+                ON CONFLICT (outlet_code) DO UPDATE SET
+                    outlet_name = EXCLUDED.outlet_name,
+                    updated_at  = NOW()
+            """, outlet_pairs, page_size=1000)
+            log.info(f"Synced {len(outlet_pairs)} outlets into dim_outlet.")
             
         conn.commit()
     except Exception as e:

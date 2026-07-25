@@ -74,7 +74,7 @@ def run() -> pd.DataFrame:
 
         # 4. Vendor master (lead times, MOQs, prices)
         vendor_df = query_df("""
-            SELECT 'Default Vendor' AS vendor_name, lower(code) AS ingredient, lead_time_days, 1 AS moq, 'KG' AS unit, 100 AS price
+            SELECT 'Default Vendor' AS vendor_name, code AS ingredient, lead_time_days, 1 AS moq, 'KG' AS unit, 100 AS price
             FROM procurement_tracker
         """)
 
@@ -82,14 +82,14 @@ def run() -> pd.DataFrame:
             print("No demand data found.")
             return pd.DataFrame()
 
-        # Normalise ingredient names
-        demand_df["ingredient"] = demand_df["ingredient"].astype(str).str.strip().str.lower()
+        # Normalise ingredient codes
+        demand_df["ingredient"] = demand_df["ingredient"].astype(str).str.strip()
         if not stock_df.empty:
-            stock_df["ingredient"] = stock_df["ingredient"].astype(str).str.strip().str.lower()
+            stock_df["ingredient"] = stock_df["ingredient"].astype(str).str.strip()
         if not pos_df.empty:
-            pos_df["ingredient"] = pos_df["ingredient"].astype(str).str.strip().str.lower()
+            pos_df["ingredient"] = pos_df["ingredient"].astype(str).str.strip()
         if not vendor_df.empty:
-            vendor_df["ingredient"] = vendor_df["ingredient"].astype(str).str.strip().str.lower()
+            vendor_df["ingredient"] = vendor_df["ingredient"].astype(str).str.strip()
 
         # Merge Data
         recs = demand_df.copy()

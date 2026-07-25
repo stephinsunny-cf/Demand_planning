@@ -122,11 +122,11 @@ def generate_dashboard_summary():
 
     # Top Moving SKUs
     movers_sql = """
-        SELECT s.sku, COALESCE(pt.ingredient, s.sku) as name, SUM(s.qty_sold) as total_qty
+        SELECT s.sku, SUM(s.qty_sold) as total_qty
         FROM fact_daily_sales s
-        LEFT JOIN procurement_tracker pt ON lower(s.sku) = lower(pt.code)
-        WHERE s.date >= (SELECT MAX(date) FROM fact_daily_sales) - INTERVAL '2 days'
-        GROUP BY s.sku, pt.ingredient
+        WHERE s.sku IN (SELECT ingredient FROM procurement_tracker)
+          AND s.date >= (SELECT MAX(date) FROM fact_daily_sales) - INTERVAL '2 days'
+        GROUP BY s.sku
         ORDER BY total_qty DESC
         LIMIT 5
     """

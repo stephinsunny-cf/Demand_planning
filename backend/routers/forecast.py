@@ -47,7 +47,7 @@ async def get_forecast(
     fore_df = query_df(f"""
         SELECT f.forecast_date, sum(f.qty_predicted) as qty_predicted, sum(f.qty_lower) as qty_lower, sum(f.qty_upper) as qty_upper, max(f.model_run_date) as model_run_date
         FROM fact_forecast f
-        LEFT JOIN procurement_tracker t ON f.sku = t.code
+        LEFT JOIN procurement_tracker t ON lower(f.sku) = lower(t.ingredient)
         WHERE f.sku IN ({sku_in}) AND f.outlet IN ({outlet_in})
           AND f.forecast_date >= '{latest - timedelta(days=7)}' AND f.forecast_date <= '{latest}'
         GROUP BY f.forecast_date
@@ -143,12 +143,12 @@ async def get_forecast_all(
             GROUP BY f.sku, f.outlet
         )
         SELECT 
-            pt.ingredient AS sku,
+            d.sku_code,
+            d.sku_name,
             COALESCE(fa.outlet, 'Network-Wide') AS outlet,
-            COALESCE(fa.agg_qty, 0) AS total_predicted,
-            pt.code AS sku_code
-        FROM procurement_tracker pt
-        LEFT JOIN forecast_agg fa ON pt.code = fa.sku
+            COALESCE(fa.agg_qty, 0) AS total_predicted
+        FROM dim_sku d
+        LEFT JOIN forecast_agg fa ON lower(d.sku_name) = lower(fa.sku)
         ORDER BY total_predicted DESC
         LIMIT 5000
     """)
