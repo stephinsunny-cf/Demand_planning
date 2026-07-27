@@ -312,18 +312,18 @@ async def change_user_role(
     return {"message": f"User role updated to {new_role}."}
 
 
-@router.put("/admin/users/{user_id}/deactivate")
-async def deactivate_user(
+@router.delete("/admin/users/{user_id}/delete")
+async def delete_user(
     user_id: str,
     caller: UserContext = Depends(require_role("super_admin"))
 ):
-    """Deactivate user account and revoke Supabase session (Super Admin only)."""
+    """Permanently delete a user account and revoke their Supabase session (Super Admin only)."""
     if user_id == caller.user_id:
-        raise HTTPException(status_code=400, detail="Super Admins cannot deactivate their own account.")
+        raise HTTPException(status_code=400, detail="Super Admins cannot delete their own account.")
 
     with get_db() as conn:
         with conn.cursor() as cur:
-            cur.execute("UPDATE user_profiles SET is_active = FALSE, updated_at = CURRENT_TIMESTAMP WHERE user_id = %s", (user_id,))
+            cur.execute("DELETE FROM user_profiles WHERE user_id = %s", (user_id,))
             conn.commit()
 
     # Revoke Supabase Auth user session immediately
@@ -332,10 +332,10 @@ async def deactivate_user(
         sb_admin = create_client(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY)
         sb_admin.auth.admin.delete_user(user_id)
     except Exception as exc:
-        log.warning("Could not revoke Supabase session during deactivation: %s", exc)
+        log.warning("Could not revoke Supabase session during deletion: %s", exc)
 
     clear_user_profile_cache(user_id)
-    return {"message": f"User {user_id} deactivated and session revoked."}
+    return {"message": f"User {user_id} deleted permanently."}
 
 
 @router.post("/auth/reset-password")
