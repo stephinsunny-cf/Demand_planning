@@ -28,6 +28,23 @@ export default function AdminPage() {
   const [newRole, setNewRole] = useState('editor');
   const [submitting, setSubmitting] = useState(false);
 
+  // Custom Confirm/Prompt Modal States
+  const [confirmDialog, setConfirmDialog] = useState<{
+    isOpen: boolean;
+    title: string;
+    message: string;
+    isDestructive?: boolean;
+    onConfirm: () => void;
+  } | null>(null);
+  
+  const [promptDialog, setPromptDialog] = useState<{
+    isOpen: boolean;
+    title: string;
+    message: string;
+    value: string;
+    onConfirm: (val: string) => void;
+  } | null>(null);
+
   // Status & Error Banners
   const [bannerSuccess, setBannerSuccess] = useState('');
   const [bannerError, setBannerError] = useState('');
@@ -81,52 +98,78 @@ export default function AdminPage() {
   };
 
   const handleResendTempPassword = async (userId: string, email: string) => {
-    if (!confirm(`Resend temporary password for ${email}? This will force a password reset on next login.`)) return;
-
-    try {
-      await api.post(`/api/admin/users/${userId}/resend-temp-password`);
-      setBannerSuccess(`New temporary password generated and emailed to ${email}.`);
-      fetchUsers();
-    } catch (err: any) {
-      setBannerError(err.response?.data?.detail || err.message || 'Failed to resend temporary password');
-    }
+    setConfirmDialog({
+      isOpen: true,
+      title: 'Resend Password',
+      message: `Resend temporary password for ${email}? This will force a password reset on next login.`,
+      onConfirm: async () => {
+        setConfirmDialog(null);
+        try {
+          await api.post(`/api/admin/users/${userId}/resend-temp-password`);
+          setBannerSuccess(`New temporary password generated and emailed to ${email}.`);
+          fetchUsers();
+        } catch (err: any) {
+          setBannerError(err.response?.data?.detail || err.message || 'Failed to resend temporary password');
+        }
+      }
+    });
   };
 
   const handleRoleChange = async (userId: string, currentRole: string) => {
-    const roles = ['reader', 'editor', 'admin', 'super_admin'];
-    const nextRole = prompt(`Change role for user (current: ${currentRole}). Enter: reader, editor, admin, or super_admin`, currentRole);
-    if (!nextRole || !roles.includes(nextRole.toLowerCase())) return;
-
-    try {
-      await api.put(`/api/admin/users/${userId}/role`, { role: nextRole.toLowerCase() });
-      setBannerSuccess(`User role updated to ${nextRole}.`);
-      fetchUsers();
-    } catch (err: any) {
-      setBannerError(err.response?.data?.detail || err.message || 'Failed to update role');
-    }
+    setPromptDialog({
+      isOpen: true,
+      title: 'Change Role',
+      message: `Change role for user (current: ${currentRole}). Enter: reader, editor, admin, or super_admin`,
+      value: currentRole,
+      onConfirm: async (nextRole) => {
+        setPromptDialog(null);
+        const roles = ['reader', 'editor', 'admin', 'super_admin'];
+        if (!nextRole || !roles.includes(nextRole.toLowerCase())) return;
+        try {
+          await api.put(`/api/admin/users/${userId}/role`, { role: nextRole.toLowerCase() });
+          setBannerSuccess(`User role updated to ${nextRole}.`);
+          fetchUsers();
+        } catch (err: any) {
+          setBannerError(err.response?.data?.detail || err.message || 'Failed to update role');
+        }
+      }
+    });
   };
 
   const handleDeactivate = async (userId: string, email: string) => {
-    if (!confirm(`Are you sure you want to deactivate ${email}? This will revoke their session immediately.`)) return;
-
-    try {
-      await api.put(`/api/admin/users/${userId}/deactivate`);
-      setBannerSuccess(`User ${email} deactivated and session revoked.`);
-      fetchUsers();
-    } catch (err: any) {
-      setBannerError(err.response?.data?.detail || err.message || 'Failed to deactivate user');
-    }
+    setConfirmDialog({
+      isOpen: true,
+      title: 'Deactivate User',
+      message: `Are you sure you want to deactivate ${email}? This will revoke their session immediately.`,
+      isDestructive: true,
+      onConfirm: async () => {
+        setConfirmDialog(null);
+        try {
+          await api.put(`/api/admin/users/${userId}/deactivate`);
+          setBannerSuccess(`User ${email} deactivated and session revoked.`);
+          fetchUsers();
+        } catch (err: any) {
+          setBannerError(err.response?.data?.detail || err.message || 'Failed to deactivate user');
+        }
+      }
+    });
   };
 
   const handleTriggerPipeline = async () => {
-    if (!confirm('Run full demand planning pipeline now?')) return;
-    setPipelineRunning(true);
-    try {
-      // Trigger pipeline API if available
-      setBannerSuccess('Pipeline run triggered. Processing in background...');
-    } finally {
-      setTimeout(() => setPipelineRunning(false), 2000);
-    }
+    setConfirmDialog({
+      isOpen: true,
+      title: 'Run Pipeline',
+      message: 'Run full demand planning pipeline now?',
+      onConfirm: () => {
+        setConfirmDialog(null);
+        setPipelineRunning(true);
+        try {
+          setBannerSuccess('Pipeline run triggered. Processing in background...');
+        } finally {
+          setTimeout(() => setPipelineRunning(false), 2000);
+        }
+      }
+    });
   };
 
   if (!canAdmin) {
@@ -349,6 +392,60 @@ export default function AdminPage() {
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* Custom Confirm Dialog */}
+      {confirmDialog?.isOpen && (
+        <div className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center p-4 z-50">
+          <div className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl p-6 max-w-sm w-full shadow-2xl">
+            <h3 className="text-lg font-bold text-slate-900 dark:text-white mb-2">{confirmDialog.title}</h3>
+            <p className="text-sm text-slate-600 dark:text-slate-300 mb-6">{confirmDialog.message}</p>
+            <div className="flex justify-end gap-3">
+              <button
+                onClick={() => setConfirmDialog(null)}
+                className="px-4 py-2 bg-slate-100 dark:bg-slate-700 hover:bg-slate-200 dark:hover:bg-slate-600 text-slate-700 dark:text-slate-300 rounded-lg text-sm font-medium transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={confirmDialog.onConfirm}
+                className={`px-4 py-2 text-white rounded-lg text-sm font-medium transition-colors ${confirmDialog.isDestructive ? 'bg-rose-600 hover:bg-rose-500' : 'bg-indigo-600 hover:bg-indigo-500'}`}
+              >
+                Confirm
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Custom Prompt Dialog */}
+      {promptDialog?.isOpen && (
+        <div className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center p-4 z-50">
+          <div className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl p-6 max-w-sm w-full shadow-2xl">
+            <h3 className="text-lg font-bold text-slate-900 dark:text-white mb-2">{promptDialog.title}</h3>
+            <p className="text-sm text-slate-600 dark:text-slate-300 mb-4">{promptDialog.message}</p>
+            <input
+              type="text"
+              value={promptDialog.value}
+              onChange={(e) => setPromptDialog({ ...promptDialog, value: e.target.value })}
+              className="w-full bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg px-3 py-2 text-sm text-slate-900 dark:text-white mb-6 focus:outline-none focus:border-indigo-500 transition-colors"
+            />
+            <div className="flex justify-end gap-3">
+              <button
+                onClick={() => setPromptDialog(null)}
+                className="px-4 py-2 bg-slate-100 dark:bg-slate-700 hover:bg-slate-200 dark:hover:bg-slate-600 text-slate-700 dark:text-slate-300 rounded-lg text-sm font-medium transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={() => promptDialog.onConfirm(promptDialog.value)}
+                className="px-4 py-2 bg-indigo-600 hover:bg-indigo-500 text-white rounded-lg text-sm font-medium transition-colors"
+              >
+                Confirm
+              </button>
+            </div>
           </div>
         </div>
       )}
