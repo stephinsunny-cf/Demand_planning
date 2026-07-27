@@ -2,8 +2,9 @@
 
 import { useState, useEffect } from 'react';
 import { usePermission } from '@/hooks/usePermission';
-import api from '@/lib/api';
 import Link from 'next/link';
+import api from '@/lib/api';
+import { useCachedApi } from '@/hooks/useCachedApi';
 import { 
   Users, Shield, UserPlus, RefreshCw, KeyRound, UserX, 
   CheckCircle2, AlertTriangle, Play, Server, FileText, ArrowLeft 
@@ -20,8 +21,10 @@ interface UserProfile {
 
 export default function AdminPage() {
   const { canAdmin, isSuperAdmin } = usePermission();
-  const [users, setUsers] = useState<UserProfile[]>([]);
-  const [loading, setLoading] = useState(true);
+  const { data: cachedUsers, loading, mutate } = useCachedApi<UserProfile[]>(
+    canAdmin ? '/api/admin/users' : null
+  );
+  const users = cachedUsers || [];
 
   // Modal State
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -54,23 +57,7 @@ export default function AdminPage() {
   // Pipeline Execution State
   const [pipelineRunning, setPipelineRunning] = useState(false);
 
-  const fetchUsers = async () => {
-    try {
-      setLoading(true);
-      const res = await api.get('/api/admin/users');
-      setUsers(res.data);
-    } catch (err) {
-      console.error('Failed to fetch users:', err);
-    } finally {
-      setLoading(false);
-    }
-  };
 
-  useEffect(() => {
-    if (canAdmin) {
-      fetchUsers();
-    }
-  }, [canAdmin]);
 
   const handleCreateUser = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -85,7 +72,7 @@ export default function AdminPage() {
       setIsModalOpen(false);
       setNewEmail('');
       setNewRole('editor');
-      fetchUsers();
+      mutate(true);
     } catch (err: any) {
       const detail = err.response?.data?.detail || err.message;
       if (detail && detail.includes('ORPHANED SUPABASE USER')) {
@@ -108,7 +95,7 @@ export default function AdminPage() {
         try {
           await api.post(`/api/admin/users/${userId}/resend-temp-password`);
           setBannerSuccess(`New temporary password generated and emailed to ${email}.`);
-          fetchUsers();
+          mutate(true);
         } catch (err: any) {
           setBannerError(err.response?.data?.detail || err.message || 'Failed to resend temporary password');
         }
@@ -129,7 +116,7 @@ export default function AdminPage() {
         try {
           await api.put(`/api/admin/users/${userId}/role`, { role: nextRole.toLowerCase() });
           setBannerSuccess(`User role updated to ${nextRole}.`);
-          fetchUsers();
+          mutate(true);
         } catch (err: any) {
           setBannerError(err.response?.data?.detail || err.message || 'Failed to update role');
         }
@@ -148,7 +135,7 @@ export default function AdminPage() {
         try {
           await api.put(`/api/admin/users/${userId}/deactivate`);
           setBannerSuccess(`User ${email} deactivated and session revoked.`);
-          fetchUsers();
+          mutate(true);
         } catch (err: any) {
           setBannerError(err.response?.data?.detail || err.message || 'Failed to deactivate user');
         }
@@ -254,7 +241,7 @@ export default function AdminPage() {
             <Users className="w-5 h-5 text-indigo-400" />
             User Profiles & Permissions ({users.length})
           </h2>
-          <button onClick={fetchUsers} className="text-slate-400 hover:text-white p-1 rounded-lg">
+          <button onClick={() => mutate(true)} className="text-slate-400 hover:text-white p-1 rounded-lg">
             <RefreshCw className="w-4 h-4" />
           </button>
         </div>
