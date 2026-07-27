@@ -208,7 +208,7 @@ export default function AdminPage() {
           <button
             onClick={handleTriggerPipeline}
             disabled={pipelineRunning}
-            className="flex items-center gap-2 bg-amber-600 hover:bg-amber-500 text-white px-4 py-2 rounded-lg font-medium text-sm transition-colors shadow-lg disabled:opacity-50"
+            className="flex items-center gap-2 bg-[#011B4D] hover:bg-[#02266b] text-white px-4 py-2 rounded-lg font-medium text-sm transition-colors shadow-lg disabled:opacity-50"
           >
             <Play className="w-4 h-4" />
             {pipelineRunning ? 'Triggering...' : 'Run Pipeline'}
