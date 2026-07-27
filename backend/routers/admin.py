@@ -212,7 +212,7 @@ async def create_user(
             created_auth_user_id = f"usr_{uuid.uuid4().hex[:12]}"
 
         # 2. Insert into PostgreSQL user_profiles
-        with get_db_connection() as conn:
+        with get_db() as conn:
             with conn.cursor() as cur:
                 cur.execute("""
                     INSERT INTO user_profiles (user_id, email, role, must_reset_password, is_active)
@@ -278,7 +278,7 @@ async def resend_temp_password(
         except Exception as sb_err:
             log.warning("Supabase update_user_by_id offline: %s", sb_err)
 
-        with get_db_connection() as conn:
+        with get_db() as conn:
             with conn.cursor() as cur:
                 cur.execute("UPDATE user_profiles SET must_reset_password = TRUE, updated_at = CURRENT_TIMESTAMP WHERE user_id = %s", (user_id,))
                 conn.commit()
@@ -303,7 +303,7 @@ async def change_user_role(
     if new_role not in ("reader", "editor", "admin", "super_admin"):
         raise HTTPException(status_code=400, detail="Invalid role name")
 
-    with get_db_connection() as conn:
+    with get_db() as conn:
         with conn.cursor() as cur:
             cur.execute("UPDATE user_profiles SET role = %s, updated_at = CURRENT_TIMESTAMP WHERE user_id = %s", (new_role, user_id))
             conn.commit()
@@ -321,7 +321,7 @@ async def deactivate_user(
     if user_id == caller.user_id:
         raise HTTPException(status_code=400, detail="Super Admins cannot deactivate their own account.")
 
-    with get_db_connection() as conn:
+    with get_db() as conn:
         with conn.cursor() as cur:
             cur.execute("UPDATE user_profiles SET is_active = FALSE, updated_at = CURRENT_TIMESTAMP WHERE user_id = %s", (user_id,))
             conn.commit()
@@ -359,7 +359,7 @@ async def reset_password(
             detail="Password must contain at least 1 uppercase letter, 1 lowercase letter, 1 number, and 1 special symbol (!@#$%^&*)."
         )
 
-    with get_db_connection() as conn:
+    with get_db() as conn:
         with conn.cursor() as cur:
             cur.execute("UPDATE user_profiles SET must_reset_password = FALSE, updated_at = CURRENT_TIMESTAMP WHERE user_id = %s OR lower(email) = lower(%s)", (user.user_id, user.email))
             conn.commit()
