@@ -86,8 +86,11 @@ export default function LoginPage() {
                 Email Address
               </label>
               <input
+                id="email"
+                name="email"
                 type="email"
                 required
+                autoComplete="username"
                 placeholder="name@curefoods.com"
                 value={email}
                 onChange={e => setEmail(e.target.value)}
@@ -101,8 +104,11 @@ export default function LoginPage() {
               </label>
               <div className="relative">
                 <input
+                  id="password"
+                  name="password"
                   type={showPassword ? "text" : "password"}
                   required
+                  autoComplete="current-password"
                   placeholder="Enter your password"
                   value={password}
                   onChange={e => setPassword(e.target.value)}
