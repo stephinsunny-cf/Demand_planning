@@ -2,7 +2,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 from typing import Optional
 from backend.auth import get_current_user, UserContext, require_role
-from backend.database import query_df, get_db_connection
+from backend.database import query_df, get_db
 from backend.utils import safe_json_response
 
 router = APIRouter(prefix="/tracker", tags=["tracker"])
@@ -37,14 +37,13 @@ async def add_tracked_item(
         raise HTTPException(status_code=400, detail="Ingredient name is required")
         
     try:
-        conn = get_db_connection()
-        with conn.cursor() as cursor:
-            cursor.execute("""
-                INSERT INTO procurement_tracker (code, ingredient, supply_mode, drr, wh_sih, open_po, neworder, lead_time_days)
-                VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
-            """, (item.code, item.ingredient, item.supply_mode, item.drr, item.wh_sih, item.open_po, item.neworder, item.lead_time_days))
-            conn.commit()
-        conn.close()
+        with get_db() as conn:
+            with conn.cursor() as cursor:
+                cursor.execute("""
+                    INSERT INTO procurement_tracker (code, ingredient, supply_mode, drr, wh_sih, open_po, neworder, lead_time_days)
+                    VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
+                """, (item.code, item.ingredient, item.supply_mode, item.drr, item.wh_sih, item.open_po, item.neworder, item.lead_time_days))
+                conn.commit()
         return {"status": "success", "message": "Item added successfully"}
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Database error: {str(e)}")
@@ -59,15 +58,14 @@ async def update_lead_time(
     user: UserContext = Depends(require_role("super_admin", "planning_manager"))
 ):
     try:
-        conn = get_db_connection()
-        with conn.cursor() as cursor:
-            cursor.execute("""
-                UPDATE procurement_tracker
-                SET lead_time_days = %s
-                WHERE ingredient = %s
-            """, (update.lead_time_days, ingredient))
-            conn.commit()
-        conn.close()
+        with get_db() as conn:
+            with conn.cursor() as cursor:
+                cursor.execute("""
+                    UPDATE procurement_tracker
+                    SET lead_time_days = %s
+                    WHERE ingredient = %s
+                """, (update.lead_time_days, ingredient))
+                conn.commit()
         return {"status": "success", "message": "Lead time updated successfully"}
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Database error: {str(e)}")

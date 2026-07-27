@@ -55,7 +55,7 @@ async def update_recipe(
     """Update recipe ingredients for a dish."""
     import psycopg2
     from psycopg2.extras import execute_values
-    from backend.database import get_db_connection
+    from backend.database import get_db
 
     records = []
     for item in items:
@@ -66,7 +66,7 @@ async def update_recipe(
             item.unit
         ))
 
-    with get_db_connection() as conn:
+    with get_db() as conn:
         with conn.cursor() as cur:
             # Delete old recipe for this dish
             cur.execute("DELETE FROM recipe_master WHERE lower(dish_name) = lower(%s)", (dish_name,))
