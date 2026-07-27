@@ -136,20 +136,20 @@ export default function AdminPage() {
     });
   };
 
-  const handleDelete = async (userId: string, email: string) => {
+  const handleDeactivate = async (userId: string, email: string) => {
     setConfirmDialog({
       isOpen: true,
-      title: 'Delete User',
-      message: `Are you sure you want to completely delete ${email}? This cannot be undone and their session will be revoked immediately.`,
+      title: 'Deactivate User',
+      message: `Are you sure you want to deactivate ${email}? This will revoke their session immediately.`,
       isDestructive: true,
       onConfirm: async () => {
         setConfirmDialog(null);
         try {
-          await api.delete(`/api/admin/users/${userId}/delete`);
-          setBannerSuccess(`User ${email} deleted permanently.`);
+          await api.put(`/api/admin/users/${userId}/deactivate`);
+          setBannerSuccess(`User ${email} deactivated and session revoked.`);
           fetchUsers();
         } catch (err: any) {
-          setBannerError(err.response?.data?.detail || err.message || 'Failed to delete user');
+          setBannerError(err.response?.data?.detail || err.message || 'Failed to deactivate user');
         }
       }
     });
@@ -317,8 +317,8 @@ export default function AdminPage() {
                             <Shield className="w-4 h-4" />
                           </button>
                           <button
-                            onClick={() => handleDelete(u.user_id, u.email)}
-                            title="Delete Account"
+                            onClick={() => handleDeactivate(u.user_id, u.email)}
+                            title="Deactivate Account"
                             className="p-1.5 bg-rose-600/20 hover:bg-rose-600/30 text-rose-300 rounded-lg transition-colors"
                           >
                             <UserX className="w-4 h-4" />
