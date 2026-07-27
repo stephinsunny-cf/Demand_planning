@@ -215,25 +215,25 @@ export default function AdminPage() {
 
       {/* Prominent Banners */}
       {criticalOrphanAlert && (
-        <div className="p-4 bg-rose-950/80 border-2 border-rose-500 rounded-xl flex items-start space-x-3 text-rose-200 shadow-2xl">
-          <AlertTriangle className="w-6 h-6 text-rose-400 shrink-0 mt-0.5" />
+        <div className="p-4 bg-rose-100 dark:bg-rose-950/80 border-2 border-rose-500 rounded-xl flex items-start space-x-3 text-rose-800 dark:text-rose-200 shadow-xl">
+          <AlertTriangle className="w-6 h-6 text-rose-600 dark:text-rose-400 shrink-0 mt-0.5" />
           <div>
-            <h4 className="font-bold text-rose-300">Action Required: Orphaned Supabase User Cleanup Failed</h4>
+            <h4 className="font-bold text-rose-900 dark:text-rose-300">Action Required: Orphaned Supabase User Cleanup Failed</h4>
             <p className="text-sm mt-1">{criticalOrphanAlert}</p>
           </div>
         </div>
       )}
 
       {bannerError && (
-        <div className="p-4 bg-rose-500/10 border border-rose-500/30 rounded-xl flex items-center space-x-3 text-rose-300 text-sm">
-          <AlertTriangle className="w-5 h-5 text-rose-400 shrink-0" />
+        <div className="p-4 bg-rose-50 dark:bg-rose-500/10 border border-rose-200 dark:border-rose-500/30 rounded-xl flex items-center space-x-3 text-rose-800 dark:text-rose-300 text-sm">
+          <AlertTriangle className="w-5 h-5 text-rose-600 dark:text-rose-400 shrink-0" />
           <span>{bannerError}</span>
         </div>
       )}
 
       {bannerSuccess && (
-        <div className="p-4 bg-emerald-500/10 border border-emerald-500/30 rounded-xl flex items-center space-x-3 text-emerald-300 text-sm">
-          <CheckCircle2 className="w-5 h-5 text-emerald-400 shrink-0" />
+        <div className="p-4 bg-emerald-50 dark:bg-emerald-500/10 border border-emerald-200 dark:border-emerald-500/30 rounded-xl flex items-center space-x-3 text-emerald-800 dark:text-emerald-300 text-sm">
+          <CheckCircle2 className="w-5 h-5 text-emerald-600 dark:text-emerald-400 shrink-0" />
           <span>{bannerSuccess}</span>
         </div>
       )}
