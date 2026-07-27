@@ -3,9 +3,10 @@
 import { useState, useEffect } from 'react';
 import { usePermission } from '@/hooks/usePermission';
 import api from '@/lib/api';
+import Link from 'next/link';
 import { 
   Users, Shield, UserPlus, RefreshCw, KeyRound, UserX, 
-  CheckCircle2, AlertTriangle, Play, Server, FileText 
+  CheckCircle2, AlertTriangle, Play, Server, FileText, ArrowLeft 
 } from 'lucide-react';
 
 interface UserProfile {
@@ -183,7 +184,15 @@ export default function AdminPage() {
   }
 
   return (
-    <div className="p-8 max-w-7xl mx-auto space-y-8">
+    <div className="p-8 max-w-7xl mx-auto space-y-6">
+      <Link 
+        href="/"
+        className="inline-flex items-center gap-2 text-sm font-medium text-slate-500 hover:text-indigo-500 dark:text-slate-400 dark:hover:text-indigo-400 transition-colors mb-2"
+      >
+        <ArrowLeft className="w-4 h-4" />
+        Back to Dashboard
+      </Link>
+      
       {/* Top Header */}
       <div className="flex justify-between items-center border-b border-slate-200 dark:border-slate-800 pb-6">
         <div>
