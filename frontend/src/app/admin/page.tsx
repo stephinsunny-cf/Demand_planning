@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { usePermission } from '@/hooks/usePermission';
+import api from '@/lib/api';
 import { 
   Users, Shield, UserPlus, RefreshCw, KeyRound, UserX, 
   CheckCircle2, AlertTriangle, Play, Server, FileText 
@@ -38,11 +39,8 @@ export default function AdminPage() {
   const fetchUsers = async () => {
     try {
       setLoading(true);
-      const res = await fetch('http://localhost:8000/api/admin/users');
-      if (res.ok) {
-        const data = await res.json();
-        setUsers(data);
-      }
+      const res = await api.get('/api/admin/users');
+      setUsers(res.data);
     } catch (err) {
       console.error('Failed to fetch users:', err);
     } finally {
@@ -64,30 +62,19 @@ export default function AdminPage() {
     setCriticalOrphanAlert('');
 
     try {
-      const res = await fetch('http://localhost:8000/api/admin/users', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email: newEmail, role: newRole }),
-      });
-
-      const data = await res.json();
-
-      if (!res.ok) {
-        if (data.detail && data.detail.includes('ORPHANED SUPABASE USER')) {
-          setCriticalOrphanAlert(data.detail);
-        } else {
-          setBannerError(data.detail || 'Failed to create user');
-        }
-        return;
-      }
-
+      const res = await api.post('/api/admin/users', { email: newEmail, role: newRole });
       setBannerSuccess(`User ${newEmail} created! A temporary password was emailed.`);
       setIsModalOpen(false);
       setNewEmail('');
       setNewRole('editor');
       fetchUsers();
     } catch (err: any) {
-      setBannerError(err.message || 'Error creating user');
+      const detail = err.response?.data?.detail || err.message;
+      if (detail && detail.includes('ORPHANED SUPABASE USER')) {
+        setCriticalOrphanAlert(detail);
+      } else {
+        setBannerError(detail || 'Failed to create user');
+      }
     } finally {
       setSubmitting(false);
     }
@@ -97,16 +84,11 @@ export default function AdminPage() {
     if (!confirm(`Resend temporary password for ${email}? This will force a password reset on next login.`)) return;
 
     try {
-      const res = await fetch(`http://localhost:8000/api/admin/users/${userId}/resend-temp-password`, {
-        method: 'POST',
-      });
-      const data = await res.json();
-
-      if (!res.ok) throw new Error(data.detail);
+      await api.post(`/api/admin/users/${userId}/resend-temp-password`);
       setBannerSuccess(`New temporary password generated and emailed to ${email}.`);
       fetchUsers();
     } catch (err: any) {
-      setBannerError(err.message || 'Failed to resend temporary password');
+      setBannerError(err.response?.data?.detail || err.message || 'Failed to resend temporary password');
     }
   };
 
@@ -116,17 +98,11 @@ export default function AdminPage() {
     if (!nextRole || !roles.includes(nextRole.toLowerCase())) return;
 
     try {
-      const res = await fetch(`http://localhost:8000/api/admin/users/${userId}/role`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ role: nextRole.toLowerCase() }),
-      });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.detail);
+      await api.put(`/api/admin/users/${userId}/role`, { role: nextRole.toLowerCase() });
       setBannerSuccess(`User role updated to ${nextRole}.`);
       fetchUsers();
     } catch (err: any) {
-      setBannerError(err.message || 'Failed to update role');
+      setBannerError(err.response?.data?.detail || err.message || 'Failed to update role');
     }
   };
 
@@ -134,15 +110,11 @@ export default function AdminPage() {
     if (!confirm(`Are you sure you want to deactivate ${email}? This will revoke their session immediately.`)) return;
 
     try {
-      const res = await fetch(`http://localhost:8000/api/admin/users/${userId}/deactivate`, {
-        method: 'PUT',
-      });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.detail);
+      await api.put(`/api/admin/users/${userId}/deactivate`);
       setBannerSuccess(`User ${email} deactivated and session revoked.`);
       fetchUsers();
     } catch (err: any) {
-      setBannerError(err.message || 'Failed to deactivate user');
+      setBannerError(err.response?.data?.detail || err.message || 'Failed to deactivate user');
     }
   };
 
@@ -170,9 +142,9 @@ export default function AdminPage() {
   return (
     <div className="p-8 max-w-7xl mx-auto space-y-8">
       {/* Top Header */}
-      <div className="flex justify-between items-center border-b border-slate-800 pb-6">
+      <div className="flex justify-between items-center border-b border-slate-200 dark:border-slate-800 pb-6">
         <div>
-          <h1 className="text-2xl font-bold text-white flex items-center gap-3">
+          <h1 className="text-2xl font-bold text-slate-900 dark:text-white flex items-center gap-3">
             <Shield className="w-7 h-7 text-indigo-400" />
             System Administration & Security
           </h1>
@@ -224,9 +196,9 @@ export default function AdminPage() {
       )}
 
       {/* User Management Section */}
-      <div className="bg-slate-800 rounded-xl border border-slate-700 overflow-hidden shadow-xl">
-        <div className="px-6 py-4 border-b border-slate-700 flex justify-between items-center bg-slate-800/50">
-          <h2 className="text-lg font-bold text-white flex items-center gap-2">
+      <div className="bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 overflow-hidden shadow-xl">
+        <div className="px-6 py-4 border-b border-slate-200 dark:border-slate-700 flex justify-between items-center bg-slate-50 dark:bg-slate-800/50">
+          <h2 className="text-lg font-bold text-slate-900 dark:text-white flex items-center gap-2">
             <Users className="w-5 h-5 text-indigo-400" />
             User Profiles & Permissions ({users.length})
           </h2>
@@ -239,8 +211,8 @@ export default function AdminPage() {
           <div className="p-8 text-center text-slate-400">Loading user profiles...</div>
         ) : (
           <div className="overflow-x-auto">
-            <table className="w-full text-left text-sm text-slate-300">
-              <thead className="bg-slate-900/60 text-slate-400 font-semibold border-b border-slate-700">
+            <table className="w-full text-left text-sm text-slate-600 dark:text-slate-300">
+              <thead className="bg-slate-50 dark:bg-slate-900/60 text-slate-500 dark:text-slate-400 font-semibold border-b border-slate-200 dark:border-slate-700">
                 <tr>
                   <th className="px-6 py-3">Email</th>
                   <th className="px-6 py-3">Role</th>
@@ -249,10 +221,10 @@ export default function AdminPage() {
                   <th className="px-6 py-3 text-right">Actions</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-slate-700/50">
+              <tbody className="divide-y divide-slate-200 dark:divide-slate-700/50">
                 {users.map((u) => (
-                  <tr key={u.user_id} className="hover:bg-slate-700/30 transition-colors">
-                    <td className="px-6 py-4 font-medium text-white">{u.email}</td>
+                  <tr key={u.user_id} className="hover:bg-slate-50 dark:hover:bg-slate-700/30 transition-colors">
+                    <td className="px-6 py-4 font-medium text-slate-900 dark:text-white">{u.email}</td>
                     <td className="px-6 py-4">
                       <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold uppercase ${
                         u.role === 'super_admin' ? 'bg-purple-500/10 text-purple-400 border border-purple-500/30' :
