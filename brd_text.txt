@@ -1,0 +1,319 @@
+--- Slide 1 ---
+
+
+DEMAND PLANNING ENGINE
+Business Requirement & Solution Architecture Document
+
+Metabase Integration
+
+SupplyNote Integration
+
+AI-Ready Architecture
+
+
+
+6 Modules
+End-to-End Coverage
+
+3–4 Months
+With Small Team
+
+85–90%
+Target Forecast Accuracy
+
+80%
+Reduction in Manual Effort
+
+
+--- Slide 2 ---
+
+Current State: The Problem We Are Solving
+Why manual planning is no longer viable at scale
+
+
+CURRENT PROCESS
+
+1
+Manual Excel Forecasting
+Planner judgment, no statistical model
+
+2
+Manual Stock Checks
+WhatsApp / calls to warehouse team
+
+3
+Reactive Procurement
+POs raised after stock-out risk noticed
+
+4
+No Integrated Data
+Sales, stock & recipes in separate systems
+
+5
+Zero Automation
+Every decision requires human intervention
+
+KEY PAIN POINTS & BUSINESS IMPACT
+
+Stock-outs: 
+Lost revenue, customer dissatisfaction, brand damage
+
+Excess Inventory: 
+High wastage costs, working capital locked up
+
+No Shortage Visibility: 
+Procurement team fires blindly without lead indicators
+
+Forecast Errors: 
+Planner bias causes ±30-40% forecast deviation
+
+High Manual Effort: 
+Planning team spends 70% time on data gathering
+
+No Exception Alerts: 
+Problems noticed only when it's already too late
+
+⚠  CRITICAL PREREQUISITE: 
+Before this engine can deliver accurate results, significant corrective actions are needed on master data — Product Master, Recipe Master, UOM standardization, and historical sales cleansing. The current state of data in Metabase and SupplyNote requires 4–6 weeks of dedicated data preparation. Skipping this step will result in garbage-in, garbage-out.
+
+
+DATA AVAILABILITY TODAY
+~60–70% of required data exists across Metabase & SupplyNote but is fragmented, inconsistently named, and not standardized for automated use.
+
+
+CORRECTIVE ACTION REQUIRED
+SKU deduplication, recipe validation per outlet, UOM unification (gm/kg/ml/L), location-store mapping, and at least 6 months of clean sales history.
+
+
+--- Slide 3 ---
+
+End-to-End Demand Planning Flow
+From raw sales data to procurement recommendation — 6 integrated modules
+
+
+
+--- Slide 4 ---
+
+Data Requirements, Accuracy & Current Gap Analysis
+What we need, what we have, and the risk of inaccuracy
+
+
+
+--- Slide 5 ---
+
+Why Data Accuracy is Non-Negotiable
+Small inaccuracies compound across modules — resulting in catastrophic procurement errors
+
+
+DATA QUALITY → FORECAST ACCURACY
+
+PHASE 1
+Target
+75%–80%
+Forecast Accuracy
+
+PHASE 2
+Target
+85%–90%
+With AI Learning
+
+
+HOW DATA ERRORS CASCADE INTO PROCUREMENT DISASTERS
+
+Recipe Error (5%)
+If Cheese quantity in recipe is 150g but system shows 142g (5% off):
+→ For 10,000 pizzas: System recommends 1,420 Kg | Actual need: 1,500 Kg → 80 Kg SHORT
+→ At ₹400/Kg = ₹32,000 variance per order cycle. Multiplied across all SKUs = Lakhs/month
+
+UOM Mismatch (gm vs Kg)
+If one record says '250' (gm) and another '0.25' (Kg), system adds them:
+→ Computed need: 250.25 Kg | Actual need: 0.50 Kg → 500x over-procurement
+→ Perishable inventory = 100% wastage. Single incident can cost ₹1–5 Lakhs
+
+Stale Kitchen Stock Data
+If kitchen stock is not updated (outlet doesn't do daily stock-take):
+→ System assumes 0 stock. Recommends full replenishment.
+→ Kitchen already has 3 days of stock = excess order, wastage, blocked working capital
+
+Missing Lead Time
+If lead time for Cheese is unknown (assumed 0 days):
+→ Procurement order placed day before shortage
+→ Vendor cannot deliver in time → Stock-out → Kitchen shut down / revenue loss
+
+Duplicate SKU Names
+If 'Margherita Pizza' and 'Margherita Pz' are two records:
+→ Sales history is split → Forecast for each = ~50% of actual demand
+→ Both forecasts are wrong → Under-procurement for both variants → Stock-out
+
+
+--- Slide 6 ---
+
+Module Logic & Calculation Framework
+How each module computes its output
+
+
+
+
+M1
+Sales Aggregation
+
+Formula:  Daily Sales = Σ (Order Qty × SKU) grouped by [Date × SKU × Location × Brand]
+Output: Clean Demand History
+Requires: SKU deduplication, null date handling, channel separation
+
+
+
+M2
+Forecasting Engine
+
+Formula:  Forecast(t) = Base × Trend Factor × Seasonality Index × Growth% × Event Multiplier
+Output: SKU × Location × Horizon Forecast
+Driven by: 6-month history + day-of-week + festival calendar + growth assumption
+
+
+
+M3
+Internal Supply Planning
+
+Formula:  Replenishment = Forecast Demand + Safety Stock − Available Kitchen/Outlet Stock
+Output: Kitchen-level replenishment requirement
+Safety stock policy must be defined by planning team per SKU category
+
+
+
+M4
+Recipe Explosion
+
+Formula:  Ingredient Demand = Σ (Forecast Units × Recipe Qty per Ingredient) × Yield Factor
+Output: Total RM + PM requirement in standard UOM
+⚠ Highest risk module — recipe errors directly multiply into procurement errors
+
+
+
+M5
+Warehouse Planning
+
+Formula:  Net Warehouse Requirement = Total Ingredient Demand − Current Warehouse Stock
+Output: Ingredient-level shortage / surplus report
+Stock adjustments and GRN accuracy in SupplyNote is critical here
+
+
+
+M6
+Procurement Engine
+
+Formula:  Procurement Qty = Net Requirement + Safety Stock − Open PO Qty  [rounded up to MOQ]
+Output: Supplier-wise purchase recommendation
+Lead time check: if delivery < lead time days, trigger URGENT flag automatically
+
+
+--- Slide 7 ---
+
+Master Data — The Single Most Critical Prerequisite
+The planning engine is only as good as the master data that feeds it
+
+
+WITHOUT MDM GOVERNANCE, THE PLANNING ENGINE WILL PRODUCE INCORRECT RESULTS — REGARDLESS OF FORECASTING ALGORITHM QUALITY
+
+⏱  Estimated MDM Remediation Effort: 4–6 weeks with dedicated data steward + culinary team validation + procurement team inputs. This is non-negotiable and must precede any engine development.
+
+
+--- Slide 8 ---
+
+Realistic Implementation Roadmap
+Phased delivery — data readiness is the critical path
+
+
+Single Resource
+5–6 Months
+
+Small Team (2–3)
+3–4 Months
+
+Dedicated Product Team
+2–3 Months
+
+
+--- Slide 9 ---
+
+What We Are Building On — 70% Already Exists
+Existing automation assets reduce total build effort significantly
+
+
+70%
+of foundational data
+& plumbing already exists
+
+EXISTING ASSETS — READY TO LEVERAGE
+
+MDM (Master Data Management)
+
+SupplyNote Integration (PO-GRN, STO-GRN)
+
+Pricing Engine
+
+Demand Downloader
+
+Metabase Sales Reporting
+
+SupplyNote Warehouse & Recipe Data
+
+STILL NEEDS TO BE BUILT (30%)
+
+Statistical Forecasting Engine
+
+Recipe Explosion Logic
+
+Warehouse Planning Automation
+
+Procurement Recommendation Engine
+
+Alert & Exception Engine
+
+Unified Planning Dashboard
+
+⚠  IMPORTANT CAVEAT:  While the plumbing exists, the DATA flowing through it requires significant corrective action before this engine can go live.
+
+
+--- Slide 10 ---
+Expected Business Impact
+What Curefoods gains once the engine is live and data is accurate
+
+
+80%
+Reduction in
+Planning Effort
+Planners shift from manual data gathering to exception management
+
+
+60–70%
+Reduction in
+Stock-outs
+Proactive demand-driven replenishment eliminates reactive firefighting
+
+
+20–30%
+Reduction in
+Inventory Wastage
+Right-sized procurement reduces excess perishable inventory
+
+
+85–90%
+Target Forecast
+Accuracy (Phase 2)
+From current ~50% accuracy to a statistical, data-driven model
+
+
+100%
+Automated Procurement
+Recommendations
+Purchase orders backed by data — not planner gut feel
+
+
+15–25%
+Working Capital
+Optimization
+Leaner inventory cycles improve cash flow across all brands
+
+
+
