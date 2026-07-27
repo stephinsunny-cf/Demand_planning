@@ -7,7 +7,7 @@ import StatusPill from '@/components/StatusPill'
 import ExportButton from '@/components/ExportButton'
 import LoadingSpinner from '@/components/LoadingSpinner'
 import { useCachedApi } from '@/hooks/useCachedApi'
-import { Truck, AlertTriangle, CheckCircle, Clock } from 'lucide-react'
+import { Truck, AlertTriangle, CheckCircle, Clock, RefreshCw } from 'lucide-react'
 
 export default function SupplyPage() {
   const [kitchen, setKitchen] = useState('')
@@ -41,6 +41,12 @@ export default function SupplyPage() {
 
   return (
     <Layout title="Supply Planning">
+      {error && (
+        <div className="p-4 bg-rose-50 dark:bg-rose-950/80 border border-rose-200 dark:border-rose-500 rounded-xl flex items-center space-x-3 text-rose-800 dark:text-rose-200 text-sm mb-6">
+          <AlertTriangle className="w-5 h-5 text-rose-600 dark:text-rose-400 shrink-0" />
+          <span>API Error: {error.message || 'Failed to fetch supply plan'}</span>
+        </div>
+      )}
       <div className="grid grid-cols-3 gap-4 mb-6">
         {[
           { 
@@ -89,6 +95,14 @@ export default function SupplyPage() {
           <option value="">All Kitchens</option>
           {kitchens.map(k => <option key={k} value={k}>{k}</option>)}
         </select>
+
+        <button 
+          onClick={() => mutate(true)}
+          className="ml-2 flex items-center gap-2 bg-indigo-100 dark:bg-indigo-900/50 hover:bg-indigo-200 dark:hover:bg-indigo-800/60 text-indigo-700 dark:text-indigo-300 px-3 py-1.5 rounded-lg text-sm font-medium transition-colors"
+        >
+          <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
+          Refresh
+        </button>
 
         <div className="flex rounded-lg overflow-hidden border border-slate-300 dark:border-slate-700">
           {['', 'RED', 'YELLOW', 'GREEN'].map(s => (
