@@ -18,7 +18,8 @@ async def get_supply_plan(
         "super_admin", "planning_manager", "demand_planner", "kitchen_ops"
     )),
 ):
-    max_date_df = query_df("SELECT max(forecast_date) as max_date FROM fact_forecast")
+    # Use the latest actual sales date as 'today' instead of the end of the future forecast
+    max_date_df = query_df("SELECT max(date) as max_date FROM fact_daily_sales")
     if not max_date_df.empty and max_date_df["max_date"].iloc[0] is not None:
         today = __import__("pandas").to_datetime(max_date_df["max_date"].iloc[0]).date()
     else:

@@ -6,7 +6,7 @@
  */
 
 const cache: Record<string, { data: unknown; ts: number }> = {}
-const TTL_MS = 5 * 60 * 1000 // 5 minutes
+const TTL_MS = 0 // 0 minutes (disabled caching for testing)
 
 export function getCached<T>(key: string): T | null {
   const entry = cache[key]

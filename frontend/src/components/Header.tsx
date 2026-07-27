@@ -5,6 +5,7 @@ import Link from 'next/link'
 import { Bell, LogOut, User, AlertCircle, Clock } from 'lucide-react'
 import { useAuth } from '@/hooks/useAuth'
 import api from '@/lib/api'
+import PageInfo from './PageInfo'
 
 export default function Header({ title }: { title: string }) {
   const { user, signOut }  = useAuth()
@@ -53,6 +54,8 @@ export default function Header({ title }: { title: string }) {
       )}
 
       <div className="flex items-center gap-3">
+        <PageInfo />
+
         {/* Alerts bell */}
         <Link href="/alerts" className="relative p-2 rounded-lg hover:bg-slate-200 dark:hover:bg-slate-800 transition-colors">
           <Bell size={18} className="text-slate-500 dark:text-slate-400" />
