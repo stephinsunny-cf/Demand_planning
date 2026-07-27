@@ -1,6 +1,7 @@
 // src/components/PageInfo.tsx
 'use client'
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
+import { createPortal } from 'react-dom'
 import { Info, X } from 'lucide-react'
 import { usePathname } from 'next/navigation'
 
@@ -141,6 +142,11 @@ export default function PageInfo() {
     )
   }
 
+  const [mounted, setMounted] = useState(false)
+  useEffect(() => {
+    setMounted(true)
+  }, [])
+
   return (
     <>
       <button 
@@ -151,8 +157,8 @@ export default function PageInfo() {
         <Info size={18} />
       </button>
 
-      {isOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-sm transition-opacity">
+      {isOpen && mounted && createPortal(
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-sm transition-opacity">
           <div 
             className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl shadow-xl w-full max-w-md overflow-hidden transform transition-all scale-100 opacity-100"
             onClick={(e) => e.stopPropagation()}
@@ -183,7 +189,8 @@ export default function PageInfo() {
               </button>
             </div>
           </div>
-        </div>
+        </div>,
+        document.body
       )}
     </>
   )
