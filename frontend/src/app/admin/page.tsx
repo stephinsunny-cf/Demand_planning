@@ -1,13 +1,14 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { usePermission } from '@/hooks/usePermission';
 import Link from 'next/link';
 import api from '@/lib/api';
 import { useCachedApi } from '@/hooks/useCachedApi';
 import { 
   Users, Shield, UserPlus, RefreshCw, KeyRound, UserX, 
-  CheckCircle2, AlertTriangle, Play, Server, FileText, ArrowLeft 
+  CheckCircle2, AlertTriangle, Play, Server, FileText, ArrowLeft,
+  ChevronDown, Check
 } from 'lucide-react';
 
 interface UserProfile {
@@ -33,6 +34,19 @@ export default function AdminPage() {
   const [submitting, setSubmitting] = useState(false);
 
   // Custom Confirm/Prompt Modal States
+  const [roleDropdownOpen, setRoleDropdownOpen] = useState(false);
+  const dropdownRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    function handleClickOutside(event: MouseEvent) {
+      if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
+        setRoleDropdownOpen(false);
+      }
+    }
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
+
   const [confirmDialog, setConfirmDialog] = useState<{
     isOpen: boolean;
     title: string;
@@ -356,16 +370,54 @@ export default function AdminPage() {
 
               <div>
                 <label className="block text-xs font-semibold text-slate-300 mb-1">Role Assignment</label>
-                <select
-                  value={newRole}
-                  onChange={(e) => setNewRole(e.target.value)}
-                  className="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-indigo-500"
-                >
-                  <option value="reader">Reader (View Only)</option>
-                  <option value="editor">Editor (Business Data Control)</option>
-                  {isSuperAdmin && <option value="admin">Admin (Operations & System Logs)</option>}
-                  {isSuperAdmin && <option value="super_admin">Super Admin (Full System Control)</option>}
-                </select>
+                <div className="relative" ref={dropdownRef}>
+                  <button
+                    type="button"
+                    onClick={() => setRoleDropdownOpen(!roleDropdownOpen)}
+                    className="w-full flex items-center justify-between bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-indigo-500 transition-all hover:border-slate-600"
+                    style={{ height: '38px' }}
+                  >
+                    <span className="truncate">
+                      {newRole === 'reader' && 'Reader (View Only)'}
+                      {newRole === 'editor' && 'Editor (Business Data Control)'}
+                      {newRole === 'admin' && 'Admin (Operations & System Logs)'}
+                      {newRole === 'super_admin' && 'Super Admin (Full System Control)'}
+                    </span>
+                    <ChevronDown size={16} className={`text-slate-400 transition-transform ${roleDropdownOpen ? 'rotate-180' : ''}`} />
+                  </button>
+
+                  {roleDropdownOpen && (
+                    <div className="absolute z-50 mt-1 w-full bg-slate-900 border border-slate-700 rounded-lg shadow-xl overflow-hidden animate-fade-in-up origin-top">
+                      <div className="p-1 space-y-1">
+                        {[
+                          { value: 'reader', label: 'Reader (View Only)' },
+                          { value: 'editor', label: 'Editor (Business Data Control)' },
+                          ...(isSuperAdmin ? [
+                            { value: 'admin', label: 'Admin (Operations & System Logs)' },
+                            { value: 'super_admin', label: 'Super Admin (Full System Control)' }
+                          ] : [])
+                        ].map((option) => {
+                          const isSelected = newRole === option.value;
+                          return (
+                            <button
+                              key={option.value}
+                              type="button"
+                              onClick={() => {
+                                setNewRole(option.value);
+                                setRoleDropdownOpen(false);
+                              }}
+                              className={`w-full flex items-center justify-between px-3 py-2 cursor-pointer rounded-lg text-left text-sm transition-colors
+                                ${isSelected ? 'bg-indigo-600 text-white' : 'text-slate-300 hover:bg-slate-800'}`}
+                            >
+                              <span>{option.label}</span>
+                              {isSelected && <Check size={16} />}
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  )}
+                </div>
                 {!isSuperAdmin && (
                   <p className="text-[11px] text-amber-400 mt-1">Note: Only Super Admins can create Admin or Super Admin users.</p>
                 )}
