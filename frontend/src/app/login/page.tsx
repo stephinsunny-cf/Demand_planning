@@ -123,7 +123,7 @@ export default function LoginPage() {
               <button
                 type="submit"
                 disabled={isSubmitting}
-                className="group w-full flex items-center justify-center gap-2 py-4 px-6 rounded-xl bg-blue-600 hover:bg-blue-700 disabled:opacity-70 text-white font-semibold text-sm transition-all duration-300 shadow-[0_0_20px_rgba(37,99,235,0.2)] hover:shadow-[0_0_25px_rgba(37,99,235,0.4)] active:scale-[0.98]"
+                className="group w-full flex items-center justify-center gap-2 py-4 px-6 rounded-xl bg-[#011B4D] hover:bg-[#02266b] disabled:opacity-70 text-white font-semibold text-sm transition-all duration-300 shadow-[0_4_20px_rgba(1,27,77,0.15)] hover:shadow-[0_6_25px_rgba(1,27,77,0.3)] active:scale-[0.98]"
               >
                 {isSubmitting ? 'Authenticating...' : 'Sign in to Dashboard'}
                 {!isSubmitting && <ArrowRight size={16} className="group-hover:translate-x-1 transition-transform" />}
