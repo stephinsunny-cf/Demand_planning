@@ -37,3 +37,6 @@ xlsxwriter>=3.1.9
 # Logging / utils
 colorlog>=6.8.2
 tenacity>=8.3.0
+
+# Email delivery
+resend>=2.0.0

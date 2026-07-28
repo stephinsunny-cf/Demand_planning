@@ -9,11 +9,9 @@ import os
 import string
 import secrets
 import logging
-import smtplib
-from email.mime.text import MIMEText
-from email.mime.multipart import MIMEMultipart
 from typing import Optional
 from pydantic import BaseModel
+import resend
 
 from fastapi import APIRouter, Depends, HTTPException, status, BackgroundTasks
 from backend.auth import get_current_user, require_role, UserContext, clear_user_profile_cache
@@ -51,65 +49,44 @@ def generate_secure_temp_password(length: int = 14) -> str:
     return "".join(pwd)
 
 
-# Gmail SMTP config from environment
-GMAIL_SENDER       = os.getenv("GMAIL_SENDER", "")       # e.g. stephin.sunny@curefoods.in
-GMAIL_APP_PASSWORD = os.getenv("GMAIL_APP_PASSWORD", "") # 16-char Google App Password
-APP_NAME           = os.getenv("APP_NAME", "Curefoods Demand Planning")
-APP_URL            = os.getenv("APP_URL", "http://localhost:3000")
+# Email config from environment
+RESEND_API_KEY = os.getenv("RESEND_API_KEY", "")
+APP_NAME       = os.getenv("APP_NAME", "Curefoods Demand Planning")
+APP_URL        = os.getenv("APP_URL", "http://localhost:3000")
+EMAIL_FROM     = os.getenv("EMAIL_FROM", "onboarding@resend.dev")  # Use your verified domain later
 
 
 def send_temp_password_email(email: str, temp_password: str) -> bool:
     """
-    Send a temporary password email via Gmail SMTP.
-    Falls back to console log if GMAIL credentials are not configured
-    (so tests and local dev continue to work without SMTP setup).
+    Send a temporary password email via Resend API.
+    Falls back to console log if RESEND_API_KEY is not configured.
     Returns True if email sent, False if fallback used.
     """
-    if not GMAIL_SENDER or not GMAIL_APP_PASSWORD:
-        log.warning(f"[EMAIL FALLBACK] Gmail not configured. Temp password for {email}: {temp_password}")
+    if not RESEND_API_KEY:
+        log.warning(f"[EMAIL FALLBACK] Resend not configured. Temp password for {email}: {temp_password}")
         return False
 
     try:
-        msg = MIMEMultipart("alternative")
-        msg["Subject"] = f"Your {APP_NAME} Account — Temporary Password"
-        msg["From"]    = f"{APP_NAME} <{GMAIL_SENDER}>"
-        msg["To"]      = email
+        resend.api_key = RESEND_API_KEY
 
-        plain_body = f"""\
-Hello,
-
-Your {APP_NAME} account has been created.
-
-Temporary Password: {temp_password}
-
-This is a one-time password. You will be required to set a new password
-immediately on your first login at:
-{APP_URL}
-
-If you did not expect this email, please contact your system administrator.
-
-Regards,
-{APP_NAME}
-"""
-
-        html_body = f"""\
+        html_body = f"""
 <html><body style="font-family: Arial, sans-serif; background:#f4f4f4; padding:30px;">
-  <div style="max-width:520px; margin:auto; background:#fff; border-radius:10px; 
+  <div style="max-width:520px; margin:auto; background:#fff; border-radius:10px;
               padding:32px; border:1px solid #e0e0e0; box-shadow:0 2px 8px rgba(0,0,0,0.05);">
-    <h2 style="color:#3f3f3f; margin-bottom:6px;">Welcome to {APP_NAME}</h2>
+    <h2 style="color:#011B4D; margin-bottom:6px;">Welcome to {APP_NAME}</h2>
     <p style="color:#666; font-size:14px;">Your account has been created by a system administrator.</p>
     <hr style="border:none; border-top:1px solid #eee; margin:20px 0;">
     <p style="font-size:14px; color:#444;">Your temporary password is:</p>
-    <div style="background:#f0f4ff; border:1px solid #c7d7ff; border-radius:6px; 
-                padding:14px 20px; font-size:22px; font-weight:bold; 
-                letter-spacing:2px; color:#1a237e; text-align:center; margin:12px 0;">
+    <div style="background:#f0f4ff; border:1px solid #c7d7ff; border-radius:6px;
+                padding:14px 20px; font-size:22px; font-weight:bold;
+                letter-spacing:2px; color:#011B4D; text-align:center; margin:12px 0;">
       {temp_password}
     </div>
     <p style="font-size:13px; color:#888; margin-top:6px;">
       ⚠️ You will be asked to set a new, permanent password immediately on first login.
     </p>
-    <a href="{APP_URL}" style="display:inline-block; margin-top:20px; padding:12px 28px; 
-       background:#4f46e5; color:#fff; border-radius:6px; text-decoration:none; 
+    <a href="{APP_URL}" style="display:inline-block; margin-top:20px; padding:12px 28px;
+       background:#011B4D; color:#fff; border-radius:6px; text-decoration:none;
        font-weight:bold; font-size:14px;">Log In Now →</a>
     <hr style="border:none; border-top:1px solid #eee; margin:28px 0 16px;">
     <p style="font-size:12px; color:#aaa;">If you did not expect this email, contact your administrator.</p>
@@ -117,34 +94,21 @@ Regards,
 </body></html>
 """
 
-        msg.attach(MIMEText(plain_body, "plain"))
-        msg.attach(MIMEText(html_body, "html"))
+        params: resend.Emails.SendParams = {
+            "from": f"{APP_NAME} <{EMAIL_FROM}>",
+            "to": [email],
+            "subject": f"Your {APP_NAME} Account — Temporary Password",
+            "html": html_body,
+        }
 
-        with smtplib.SMTP_SSL("smtp.gmail.com", 465) as smtp:
-            smtp.login(GMAIL_SENDER, GMAIL_APP_PASSWORD)
-            smtp.sendmail(GMAIL_SENDER, email, msg.as_string())
-
-        log.info(f"[EMAIL] Temporary password sent to {email} via Gmail SMTP.")
+        response = resend.Emails.send(params)
+        log.info(f"[EMAIL] Temporary password sent to {email} via Resend. ID: {response.get('id')}")
         return True
 
-    except smtplib.SMTPAuthenticationError:
-        log.error("[EMAIL] Gmail SMTP authentication failed. Check GMAIL_SENDER and GMAIL_APP_PASSWORD in .env")
-        raise HTTPException(
-            status_code=500,
-            detail="Email delivery failed: Gmail authentication error. Contact system administrator to verify SMTP credentials."
-        )
-    except smtplib.SMTPException as e:
-        log.error(f"[EMAIL] SMTP error sending to {email}: {e}")
-        raise HTTPException(
-            status_code=500,
-            detail=f"Email delivery failed (SMTP error): {str(e)}"
-        )
     except Exception as e:
-        log.error(f"[EMAIL] Unexpected error sending to {email}: {e}")
-        raise HTTPException(
-            status_code=500,
-            detail=f"Email delivery failed: {str(e)}"
-        )
+        log.error(f"[EMAIL] Resend error sending to {email}: {e}")
+        # Don't raise — log and continue so user creation still succeeds
+        return False
 
 
 
