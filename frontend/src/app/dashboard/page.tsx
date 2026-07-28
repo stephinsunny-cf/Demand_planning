@@ -264,26 +264,7 @@ export default function DashboardPage() {
             </div>
           </div>
 
-          {/* Quick nav */}
-          <div>
-            <h2 className="text-sm font-medium text-slate-500 mb-3">Quick Access</h2>
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-              {[
-                { href: '/forecast',    label: 'View Forecasts' },
-                { href: '/supply',      label: 'Supply Plan' },
-                { href: '/warehouse',   label: 'Warehouse Status' },
-                { href: '/procurement', label: 'Procurement' },
-              ].map(({ href, label }) => (
-                <a
-                  key={href}
-                  href={href}
-                  className="flex items-center justify-center py-3 px-4 rounded-xl text-sm font-medium bg-white dark:bg-slate-900 border border-slate-100 dark:border-slate-800 text-slate-600 dark:text-slate-300 shadow-sm dark:shadow-none transition-all duration-200 hover:text-slate-900 dark:hover:text-white hover:bg-slate-50 dark:hover:bg-slate-800 dark:hover:border-slate-700 hover:-translate-y-0.5 hover:shadow-md"
-                >
-                  {label}
-                </a>
-              ))}
-            </div>
-          </div>
+
         </div>
       )}
     </Layout>

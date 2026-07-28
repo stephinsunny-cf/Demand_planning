@@ -33,11 +33,11 @@ export default function Layout({ title, children }: Props) {
   if (!user) return null
 
   return (
-    <div className="min-h-screen flex bg-white dark:bg-slate-950 text-slate-900 dark:text-white transition-colors">
+    <div className="h-screen overflow-hidden flex bg-white dark:bg-slate-950 text-slate-900 dark:text-white transition-colors">
       <Sidebar />
-      <div className="flex-1 flex flex-col min-w-0 bg-white dark:bg-slate-950">
+      <div className="flex-1 flex flex-col min-w-0 bg-white dark:bg-slate-950 overflow-hidden">
         <Header title={title} />
-        <main className="flex-1 p-6 sm:px-10 overflow-auto">
+        <main className="flex-1 p-6 sm:px-10 overflow-y-auto">
           {children}
         </main>
       </div>

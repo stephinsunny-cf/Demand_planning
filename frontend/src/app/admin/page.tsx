@@ -3,6 +3,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { usePermission } from '@/hooks/usePermission';
 import Link from 'next/link';
+import Layout from '@/components/Layout';
 import api from '@/lib/api';
 import { useCachedApi } from '@/hooks/useCachedApi';
 import { 
@@ -224,23 +225,19 @@ export default function AdminPage() {
 
   if (!canAdmin) {
     return (
-      <div className="p-8 text-center text-slate-400">
-        <Shield className="w-12 h-12 text-rose-500 mx-auto mb-4" />
-        <h2 className="text-xl font-bold text-white mb-2">Access Denied</h2>
-        <p className="text-sm">You must have Admin or Super Admin privileges to view this section.</p>
-      </div>
+      <Layout title="Admin">
+        <div className="p-8 text-center text-slate-400">
+          <Shield className="w-12 h-12 text-rose-500 mx-auto mb-4" />
+          <h2 className="text-xl font-bold text-slate-900 dark:text-white mb-2">Access Denied</h2>
+          <p className="text-sm">You must have Admin or Super Admin privileges to view this section.</p>
+        </div>
+      </Layout>
     );
   }
 
   return (
-    <div className="p-8 max-w-7xl mx-auto space-y-6">
-      <Link 
-        href="/"
-        className="inline-flex items-center gap-2 text-sm font-medium text-slate-500 hover:text-blue-500 dark:text-slate-400 dark:hover:text-blue-400 transition-colors mb-2"
-      >
-        <ArrowLeft className="w-4 h-4" />
-        Back to Dashboard
-      </Link>
+    <Layout title="Admin">
+      <div className="max-w-7xl mx-auto space-y-6">
       
       {/* Top Header */}
       <div className="flex justify-between items-center border-b border-slate-200 dark:border-slate-800 pb-6">
@@ -636,6 +633,7 @@ export default function AdminPage() {
           </div>
         </div>
       )}
-    </div>
+      </div>
+    </Layout>
   );
 }
