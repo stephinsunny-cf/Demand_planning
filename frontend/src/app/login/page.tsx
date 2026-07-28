@@ -27,6 +27,16 @@ export default function LoginPage() {
     setIsSubmitting(true)
     try {
       await signInWithEmail(email, password)
+      // Check if user must reset password on first login
+      try {
+        const res = await fetch('/api/auth/profile', { credentials: 'include' })
+        const data = await res.json()
+        if (data?.must_reset_password) {
+          router.push('/reset-password')
+          return
+        }
+      } catch (_) {}
+      router.push('/dashboard')
     } catch (err: any) {
       setErrorMsg(err.message || 'Failed to sign in')
       setIsSubmitting(false)
