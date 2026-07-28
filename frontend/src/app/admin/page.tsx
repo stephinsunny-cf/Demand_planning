@@ -188,7 +188,7 @@ export default function AdminPage() {
     <div className="p-8 max-w-7xl mx-auto space-y-6">
       <Link 
         href="/"
-        className="inline-flex items-center gap-2 text-sm font-medium text-slate-500 hover:text-indigo-500 dark:text-slate-400 dark:hover:text-indigo-400 transition-colors mb-2"
+        className="inline-flex items-center gap-2 text-sm font-medium text-slate-500 hover:text-blue-500 dark:text-slate-400 dark:hover:text-blue-400 transition-colors mb-2"
       >
         <ArrowLeft className="w-4 h-4" />
         Back to Dashboard
@@ -198,7 +198,7 @@ export default function AdminPage() {
       <div className="flex justify-between items-center border-b border-slate-200 dark:border-slate-800 pb-6">
         <div>
           <h1 className="text-2xl font-bold text-slate-900 dark:text-white flex items-center gap-3">
-            <Shield className="w-7 h-7 text-indigo-400" />
+            <Shield className="w-7 h-7 text-blue-400" />
             System Administration & Security
           </h1>
           <p className="text-sm text-slate-400 mt-1">Manage user access, role assignments, and pipeline operations</p>
@@ -252,7 +252,7 @@ export default function AdminPage() {
       <div className="bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 overflow-hidden shadow-xl">
         <div className="px-6 py-4 border-b border-slate-200 dark:border-slate-700 flex justify-between items-center bg-slate-50 dark:bg-slate-800/50">
           <h2 className="text-lg font-bold text-slate-900 dark:text-white flex items-center gap-2">
-            <Users className="w-5 h-5 text-indigo-400" />
+            <Users className="w-5 h-5 text-blue-400" />
             User Profiles & Permissions ({users.length})
           </h2>
           <button onClick={() => mutate(true)} className="text-slate-400 hover:text-white p-1 rounded-lg">
@@ -281,7 +281,7 @@ export default function AdminPage() {
                     <td className="px-6 py-4">
                       <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold uppercase ${
                         u.role === 'super_admin' ? 'bg-purple-500/10 text-purple-400 border border-purple-500/30' :
-                        u.role === 'admin' ? 'bg-indigo-500/10 text-indigo-400 border border-indigo-500/30' :
+                        u.role === 'admin' ? 'bg-blue-500/10 text-blue-400 border border-blue-500/30' :
                         u.role === 'editor' ? 'bg-blue-500/10 text-blue-400 border border-blue-500/30' :
                         'bg-slate-700 text-slate-300'
                       }`}>
@@ -322,7 +322,7 @@ export default function AdminPage() {
                           <button
                             onClick={() => handleRoleChange(u.user_id, u.role)}
                             title="Change User Role"
-                            className="p-1.5 bg-indigo-600/20 hover:bg-indigo-600/30 text-indigo-300 rounded-lg transition-colors"
+                            className="p-1.5 bg-blue-600/20 hover:bg-blue-600/30 text-blue-300 rounded-lg transition-colors"
                           >
                             <Shield className="w-4 h-4" />
                           </button>
@@ -364,7 +364,7 @@ export default function AdminPage() {
                   onChange={(e) => setNewEmail(e.target.value)}
                   required
                   placeholder="user@curefoods.in"
-                  className="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-indigo-500"
+                  className="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-blue-500"
                 />
               </div>
 
@@ -374,14 +374,14 @@ export default function AdminPage() {
                   <button
                     type="button"
                     onClick={() => setRoleDropdownOpen(!roleDropdownOpen)}
-                    className="w-full flex items-center justify-between bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-indigo-500 transition-all hover:border-slate-600"
+                    className="w-full flex items-center justify-between bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-blue-500 transition-all hover:border-slate-600"
                     style={{ height: '38px' }}
                   >
                     <span className="truncate">
-                      {newRole === 'reader' && 'Reader (View Only)'}
-                      {newRole === 'editor' && 'Editor (Business Data Control)'}
-                      {newRole === 'admin' && 'Admin (Operations & System Logs)'}
-                      {newRole === 'super_admin' && 'Super Admin (Full System Control)'}
+                      {newRole === 'reader' && 'Reader'}
+                      {newRole === 'editor' && 'Editor'}
+                      {newRole === 'admin' && 'Admin'}
+                      {newRole === 'super_admin' && 'Super Admin'}
                     </span>
                     <ChevronDown size={16} className={`text-slate-400 transition-transform ${roleDropdownOpen ? 'rotate-180' : ''}`} />
                   </button>
@@ -390,11 +390,11 @@ export default function AdminPage() {
                     <div className="absolute z-50 mt-1 w-full bg-slate-900 border border-slate-700 rounded-lg shadow-xl overflow-hidden animate-fade-in-up origin-top">
                       <div className="p-1 space-y-1">
                         {[
-                          { value: 'reader', label: 'Reader (View Only)' },
-                          { value: 'editor', label: 'Editor (Business Data Control)' },
+                          { value: 'reader', label: 'Reader' },
+                          { value: 'editor', label: 'Editor' },
                           ...(isSuperAdmin ? [
-                            { value: 'admin', label: 'Admin (Operations & System Logs)' },
-                            { value: 'super_admin', label: 'Super Admin (Full System Control)' }
+                            { value: 'admin', label: 'Admin' },
+                            { value: 'super_admin', label: 'Super Admin' }
                           ] : [])
                         ].map((option) => {
                           const isSelected = newRole === option.value;
@@ -407,7 +407,7 @@ export default function AdminPage() {
                                 setRoleDropdownOpen(false);
                               }}
                               className={`w-full flex items-center justify-between px-3 py-2 cursor-pointer rounded-lg text-left text-sm transition-colors
-                                ${isSelected ? 'bg-indigo-600 text-white' : 'text-slate-300 hover:bg-slate-800'}`}
+                                ${isSelected ? 'bg-[#011B4D] text-white' : 'text-slate-300 hover:bg-slate-800'}`}
                             >
                               <span>{option.label}</span>
                               {isSelected && <Check size={16} />}
@@ -459,7 +459,7 @@ export default function AdminPage() {
               </button>
               <button
                 onClick={confirmDialog.onConfirm}
-                className={`px-4 py-2 text-white rounded-lg text-sm font-medium transition-colors ${confirmDialog.isDestructive ? 'bg-rose-600 hover:bg-rose-500' : 'bg-indigo-600 hover:bg-indigo-500'}`}
+                className={`px-4 py-2 text-white rounded-lg text-sm font-medium transition-colors ${confirmDialog.isDestructive ? 'bg-rose-600 hover:bg-rose-500' : 'bg-[#011B4D] hover:bg-[#02266b]'}`}
               >
                 Confirm
               </button>
@@ -478,7 +478,7 @@ export default function AdminPage() {
               type="text"
               value={promptDialog.value}
               onChange={(e) => setPromptDialog({ ...promptDialog, value: e.target.value })}
-              className="w-full bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg px-3 py-2 text-sm text-slate-900 dark:text-white mb-6 focus:outline-none focus:border-indigo-500 transition-colors"
+              className="w-full bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg px-3 py-2 text-sm text-slate-900 dark:text-white mb-6 focus:outline-none focus:border-blue-500 transition-colors"
             />
             <div className="flex justify-end gap-3">
               <button
@@ -489,7 +489,7 @@ export default function AdminPage() {
               </button>
               <button
                 onClick={() => promptDialog.onConfirm(promptDialog.value)}
-                className="px-4 py-2 bg-indigo-600 hover:bg-indigo-500 text-white rounded-lg text-sm font-medium transition-colors"
+                className="px-4 py-2 bg-[#011B4D] hover:bg-[#02266b] text-white rounded-lg text-sm font-medium transition-colors"
               >
                 Confirm
               </button>
