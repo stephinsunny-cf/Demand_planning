@@ -12,7 +12,7 @@ router = APIRouter()
 
 
 @router.get("/procurement")
-async def get_procurement(
+def get_procurement(
     vendor:   Optional[str] = Query(default=None),
     urgency:  Optional[str] = Query(default=None, description="URGENT or NORMAL"),
     user: UserContext = Depends(require_role("super_admin", "planning_manager", "procurement")),
@@ -39,7 +39,7 @@ async def get_procurement(
 
 
 @router.post("/procurement/{ingredient}/mark_ordered")
-async def mark_ordered(
+def mark_ordered(
     ingredient: str,
     user: UserContext = Depends(require_role("super_admin", "procurement")),
 ):

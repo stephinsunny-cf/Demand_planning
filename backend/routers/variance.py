@@ -8,7 +8,7 @@ import pandas as pd
 router = APIRouter()
 
 @router.get("/variance")
-async def get_variance(
+def get_variance(
     start_date: Optional[str] = None,
     end_date:   Optional[str] = None,
     outlet:     Optional[str] = None,

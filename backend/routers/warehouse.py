@@ -10,7 +10,7 @@ router = APIRouter()
 
 
 @router.get("/warehouse")
-async def get_warehouse(
+def get_warehouse(
     status:     Optional[str] = Query(default=None, description="RED, YELLOW, GREEN"),
     ingredient: Optional[str] = Query(default=None),
     user: UserContext = Depends(require_role(

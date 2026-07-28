@@ -11,7 +11,7 @@ router = APIRouter()
 
 
 @router.get("/supply")
-async def get_supply_plan(
+def get_supply_plan(
     kitchen: Optional[str] = Query(default=None),
     status:  Optional[str] = Query(default=None, description="RED, YELLOW, GREEN"),
     user: UserContext = Depends(require_role(

@@ -11,7 +11,7 @@ router = APIRouter()
 
 
 @router.get("/reports/accuracy")
-async def get_accuracy_report(
+def get_accuracy_report(
     days: int = Query(default=90),
     user: UserContext = Depends(require_role("super_admin", "planning_manager", "leadership")),
 ):
@@ -20,7 +20,7 @@ async def get_accuracy_report(
 
 
 @router.get("/reports/stockouts")
-async def get_stockout_report(
+def get_stockout_report(
     days: int = Query(default=90),
     user: UserContext = Depends(require_role("super_admin", "planning_manager", "leadership")),
 ):
@@ -29,7 +29,7 @@ async def get_stockout_report(
 
 
 @router.get("/reports/wastage")
-async def get_wastage_report(
+def get_wastage_report(
     days: int = Query(default=30),
     user: UserContext = Depends(require_role("super_admin", "planning_manager", "leadership")),
 ):
@@ -38,7 +38,7 @@ async def get_wastage_report(
 
 
 @router.get("/reports/vendor")
-async def get_vendor_performance(
+def get_vendor_performance(
     user: UserContext = Depends(require_role("super_admin", "planning_manager", "leadership")),
 ):
     cache_df = query_df("SELECT payload FROM app_cache WHERE endpoint = 'reports_vendor'")

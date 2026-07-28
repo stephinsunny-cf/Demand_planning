@@ -12,7 +12,7 @@ IST = timezone(timedelta(hours=5, minutes=30))
 
 
 @router.get("/alerts")
-async def get_alerts(
+def get_alerts(
     severity: Optional[str] = Query(default=None, description="CRITICAL, WARNING, INFO"),
     resolved: Optional[bool] = Query(default=False),
     user: UserContext = Depends(get_current_user),
@@ -40,7 +40,7 @@ async def get_alerts(
 
 
 @router.post("/alerts/{alert_id}/resolve")
-async def resolve_alert(
+def resolve_alert(
     alert_id: str,
     user: UserContext = Depends(get_current_user),
 ):

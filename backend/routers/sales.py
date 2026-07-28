@@ -12,7 +12,7 @@ router = APIRouter()
 
 
 @router.get("/sales/pos")
-async def get_sales_pos(
+def get_sales_pos(
     start_date: Optional[str] = None,
     end_date:   Optional[str] = None,
     brand:      Optional[str] = None,
@@ -56,7 +56,7 @@ async def get_sales_pos(
 
 
 @router.get("/sales/pos/summary")
-async def get_sales_pos_summary(
+def get_sales_pos_summary(
     start_date: Optional[str] = None,
     end_date:   Optional[str] = None,
     user: UserContext = Depends(require_role("super_admin", "planning_manager", "demand_planner")),
@@ -116,7 +116,7 @@ async def get_sales_pos_summary(
 
 
 @router.get("/sales")
-async def get_sales(
+def get_sales(
     start_date: Optional[str] = None,
     end_date:   Optional[str] = None,
     brand:      Optional[str] = None,
@@ -160,7 +160,7 @@ async def get_sales(
 
 
 @router.get("/sales/summary")
-async def get_sales_summary(
+def get_sales_summary(
     start_date: Optional[str] = None,
     end_date:   Optional[str] = None,
     user: UserContext = Depends(require_role("super_admin", "planning_manager", "demand_planner")),

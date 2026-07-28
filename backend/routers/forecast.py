@@ -11,7 +11,7 @@ router = APIRouter()
 
 
 @router.get("/forecast")
-async def get_forecast(
+def get_forecast(
     sku:    str = Query(..., description="Comma separated SKUs"),
     outlet: str = Query(..., description="Comma separated Outlets"),
     days:   int = Query(default=14, description="Forecast horizon: 7, 14, or 30"),
@@ -84,14 +84,14 @@ def get_cached_outlet_city_mapping():
     return filters, mapping
 
 @router.get("/forecast/filters")
-async def get_forecast_filters(
+def get_forecast_filters(
     user: UserContext = Depends(require_role("super_admin", "planning_manager", "demand_planner"))
 ):
     filters, _ = get_cached_outlet_city_mapping()
     return filters
 
 @router.get("/forecast/all")
-async def get_forecast_all(
+def get_forecast_all(
     locations: Optional[str] = None,
     outlets: Optional[str] = None,
     days: int = Query(default=7, description="Forecast horizon: 7, 14, or 30"),

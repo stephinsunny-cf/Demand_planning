@@ -128,14 +128,14 @@ class ResetPasswordRequest(BaseModel):
 
 
 @router.get("/admin/users")
-async def list_users(user: UserContext = Depends(require_role("admin", "super_admin"))):
+def list_users(user: UserContext = Depends(require_role("admin", "super_admin"))):
     """List all user profiles (Admin / Super Admin only)."""
     df = query_df("SELECT user_id, email, role, must_reset_password, is_active, created_at FROM user_profiles ORDER BY created_at DESC")
     return df.to_dict(orient="records") if not df.empty else []
 
 
 @router.post("/admin/users")
-async def create_user(
+def create_user(
     req: CreateUserRequest,
     background_tasks: BackgroundTasks,
     caller: UserContext = Depends(require_role("admin", "super_admin"))
@@ -222,7 +222,7 @@ async def create_user(
 
 
 @router.post("/admin/users/{user_id}/resend-temp-password")
-async def resend_temp_password(
+def resend_temp_password(
     user_id: str,
     background_tasks: BackgroundTasks,
     caller: UserContext = Depends(require_role("admin", "super_admin"))
@@ -263,7 +263,7 @@ async def resend_temp_password(
 
 
 @router.put("/admin/users/{user_id}/role")
-async def change_user_role(
+def change_user_role(
     user_id: str,
     req: ChangeRoleRequest,
     caller: UserContext = Depends(require_role("super_admin"))
@@ -283,7 +283,7 @@ async def change_user_role(
 
 
 @router.put("/admin/users/{user_id}/deactivate")
-async def deactivate_user(
+def deactivate_user(
     user_id: str,
     caller: UserContext = Depends(require_role("super_admin"))
 ):
@@ -309,7 +309,7 @@ async def deactivate_user(
 
 
 @router.put("/admin/users/{user_id}/reactivate")
-async def reactivate_user(
+def reactivate_user(
     user_id: str,
     caller: UserContext = Depends(require_role("super_admin"))
 ):
@@ -324,7 +324,7 @@ async def reactivate_user(
 
 
 @router.post("/auth/reset-password")
-async def reset_password(
+def reset_password(
     req: ResetPasswordRequest,
     user: UserContext = Depends(get_current_user)
 ):

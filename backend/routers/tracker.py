@@ -18,7 +18,7 @@ class TrackerItem(BaseModel):
     lead_time_days: Optional[float] = 7.0
 
 @router.get("")
-async def get_tracked_items(
+def get_tracked_items(
     user: UserContext = Depends(require_role("super_admin", "planning_manager", "demand_planner", "procurement"))
 ):
     df = query_df("""
@@ -29,7 +29,7 @@ async def get_tracked_items(
     return safe_json_response(df.to_dict(orient="records") if not df.empty else [])
 
 @router.post("")
-async def add_tracked_item(
+def add_tracked_item(
     item: TrackerItem,
     user: UserContext = Depends(require_role("super_admin", "planning_manager"))
 ):
@@ -52,7 +52,7 @@ class LeadTimeUpdate(BaseModel):
     lead_time_days: float
 
 @router.put("/{ingredient}/lead_time")
-async def update_lead_time(
+def update_lead_time(
     ingredient: str,
     update: LeadTimeUpdate,
     user: UserContext = Depends(require_role("super_admin", "planning_manager"))

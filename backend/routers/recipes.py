@@ -18,7 +18,7 @@ class RecipeUpdateItem(BaseModel):
 
 
 @router.get("/recipes")
-async def get_recipes(
+def get_recipes(
     dish_name: Optional[str] = Query(default=None),
     user: UserContext = Depends(require_role("reader", "editor", "admin", "super_admin")),
 ):
@@ -47,7 +47,7 @@ async def get_recipes(
 
 
 @router.put("/recipes/{dish_name}")
-async def update_recipe(
+def update_recipe(
     dish_name: str,
     items: list[RecipeUpdateItem],
     user: UserContext = Depends(require_role("editor", "admin", "super_admin")),
