@@ -15,7 +15,7 @@ from email.mime.multipart import MIMEMultipart
 from typing import Optional
 from pydantic import BaseModel
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, status, BackgroundTasks
 from backend.auth import get_current_user, require_role, UserContext, clear_user_profile_cache
 from backend.database import get_db, query_df
 
@@ -171,6 +171,7 @@ async def list_users(user: UserContext = Depends(require_role("admin", "super_ad
 @router.post("/admin/users")
 async def create_user(
     req: CreateUserRequest,
+    background_tasks: BackgroundTasks,
     caller: UserContext = Depends(require_role("admin", "super_admin"))
 ):
     """
@@ -224,8 +225,8 @@ async def create_user(
                 """, (created_auth_user_id, req.email, requested_role))
                 conn.commit()
 
-        # 3. Send temporary password email
-        send_temp_password_email(req.email, temp_password)
+        # 3. Send temporary password email in the background
+        background_tasks.add_task(send_temp_password_email, req.email, temp_password)
         clear_user_profile_cache(created_auth_user_id)
 
         return {
