@@ -52,7 +52,6 @@ from pipeline.loaders import postgres as loader
 from pipeline.loaders.postgres import log_pipeline_run
 from pipeline.engines      import (
     forecast_engine,
-    supply_planning,
     warehouse_planning,
     procurement_engine,
     alert_engine,
@@ -113,10 +112,6 @@ def run_full_pipeline(skip_extract: bool = False):
     log.info("\n[Engine 2] Forecast Engine (Prophet)")
     forecasts = forecast_engine.run()
     log_pipeline_run("forecast_engine", started_at, "SUCCESS", len(forecasts) if forecasts is not None else 0)
-
-    log.info("\n[Engine 3] Supply Planning")
-    supply_plan = supply_planning.run()
-    # supply_planning logs itself
 
     log.info("\n[Engine 4] Variance Engine")
     variance_analysis = variance_engine.run_variance_engine()

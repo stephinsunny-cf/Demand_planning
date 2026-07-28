@@ -90,17 +90,6 @@ DDL_STATEMENTS = [
     
     # ── Pipeline Output Tables (Supply Plan) ───────────────────────────────
     """
-    CREATE TABLE IF NOT EXISTS fact_supply_plan (
-        plan_date       DATE,
-        sku             VARCHAR(100),
-        outlet          VARCHAR(100),
-        qty_to_produce  REAL,
-        safety_stock    REAL,
-        run_date        DATE,
-        inserted_at     TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-    )
-    """,
-    """
     CREATE TABLE IF NOT EXISTS pipeline_runs (
         id              SERIAL PRIMARY KEY,
         job_name        VARCHAR(100),

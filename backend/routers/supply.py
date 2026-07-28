@@ -1,5 +1,6 @@
 """backend/routers/supply.py — GET /api/supply"""
 
+import asyncio
 from datetime import date, timedelta
 from typing import Optional
 from fastapi import APIRouter, Depends, Query
@@ -11,7 +12,7 @@ router = APIRouter()
 
 
 @router.get("/supply")
-def get_supply_plan(
+async def get_supply_plan(
     kitchen: Optional[str] = Query(default=None),
     status:  Optional[str] = Query(default=None, description="RED, YELLOW, GREEN"),
     user: UserContext = Depends(require_role(
@@ -19,7 +20,7 @@ def get_supply_plan(
     )),
 ):
     # Use the latest actual sales date as 'today' instead of the end of the future forecast
-    max_date_df = query_df("SELECT max(date) as max_date FROM fact_daily_sales")
+    max_date_df = await asyncio.to_thread(query_df, "SELECT max(date) as max_date FROM fact_daily_sales")
     if not max_date_df.empty and max_date_df["max_date"].iloc[0] is not None:
         today = __import__("pandas").to_datetime(max_date_df["max_date"].iloc[0]).date()
     else:
@@ -27,13 +28,13 @@ def get_supply_plan(
         
     in_3d    = today + timedelta(days=3)
 
-    plan = query_df(f"""
+    plan = await asyncio.to_thread(query_df, """
         WITH forecast AS (
             SELECT f.ingredient AS sku_code, d.sku_name AS sku, f.outlet AS kitchen,
                    sum(f.total_qty_needed) AS forecast_3day
             FROM fact_ingredient_demand f
             JOIN dim_sku d ON f.ingredient = d.sku_code
-            WHERE f.forecast_date >= '{today}' AND f.forecast_date <= '{in_3d}'
+            WHERE f.forecast_date >= %s AND f.forecast_date <= %s
             GROUP BY f.ingredient, d.sku_name, f.outlet
         ),
         latest_stock AS (
@@ -61,7 +62,7 @@ def get_supply_plan(
         FROM forecast f
         LEFT JOIN latest_stock s ON f.kitchen = s.kitchen AND f.sku_code = s.sku_code
         LEFT JOIN safety sf ON f.sku = sf.sku AND f.kitchen = sf.kitchen
-    """)
+    """, params=(today, in_3d))
 
     if plan.empty:
         return []
