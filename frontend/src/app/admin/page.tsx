@@ -89,6 +89,17 @@ export default function AdminPage() {
   const [bannerError, setBannerError] = useState('');
   const [criticalOrphanAlert, setCriticalOrphanAlert] = useState('');
 
+  // Auto-dismiss banners after 10 seconds
+  useEffect(() => {
+    if (bannerSuccess || bannerError) {
+      const timer = setTimeout(() => {
+        setBannerSuccess('');
+        setBannerError('');
+      }, 10000);
+      return () => clearTimeout(timer);
+    }
+  }, [bannerSuccess, bannerError]);
+
   // Pipeline Execution State
   const [pipelineRunning, setPipelineRunning] = useState(false);
 
