@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { Eye, EyeOff, ArrowRight } from 'lucide-react'
 import { useAuth } from '@/hooks/useAuth'
+import api from '@/lib/api'
 
 export default function LoginPage() {
   const { user, loading, signInWithEmail } = useAuth()
@@ -15,11 +16,13 @@ export default function LoginPage() {
   const [errorMsg, setErrorMsg] = useState('')
   const [isSubmitting, setIsSubmitting] = useState(false)
 
+  // Auto-redirect if already logged in (when loading the page initially)
   useEffect(() => {
     if (!loading && user) {
-      router.push('/dashboard')
+      // Don't auto-redirect here to avoid race conditions with the login handler
+      // We assume if they land on /login and have a session, we shouldn't force them anywhere unless they click
     }
-  }, [user, loading, router])
+  }, [user, loading])
 
   const handleEmailLogin = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -27,21 +30,28 @@ export default function LoginPage() {
     setIsSubmitting(true)
     try {
       await signInWithEmail(email, password)
+      
+      // Delay slightly to ensure cookie is propagated
+      await new Promise(r => setTimeout(r, 500))
+      
       // Check if user must reset password on first login
       try {
-        const res = await fetch('/api/auth/profile', { credentials: 'include' })
-        const data = await res.json()
-        if (data?.must_reset_password) {
-          router.push('/reset-password')
+        const res = await api.get('/api/auth/profile')
+        if (res.data?.must_reset_password) {
+          router.push('/settings')
           return
         }
-      } catch (_) {}
+      } catch (profileErr) {
+        console.warn('Could not fetch profile for reset check', profileErr)
+      }
+      
       router.push('/dashboard')
     } catch (err: any) {
       setErrorMsg(err.message || 'Failed to sign in')
       setIsSubmitting(false)
     }
   }
+
 
   return (
     <div className="min-h-screen flex flex-col md:flex-row bg-slate-900 overflow-hidden font-sans">
