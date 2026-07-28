@@ -1,5 +1,6 @@
 """backend/routers/warehouse.py — GET /api/warehouse"""
 
+import asyncio
 from typing import Optional
 from fastapi import APIRouter, Depends, Query
 
@@ -10,7 +11,7 @@ router = APIRouter()
 
 
 @router.get("/warehouse")
-def get_warehouse(
+async def get_warehouse(
     status:     Optional[str] = Query(default=None, description="RED, YELLOW, GREEN"),
     ingredient: Optional[str] = Query(default=None),
     user: UserContext = Depends(require_role(
@@ -20,7 +21,7 @@ def get_warehouse(
     import pandas as pd
 
     # Ingredient demand (from recipe master × forecast)
-    demand_df = query_df("""
+    task_demand = asyncio.to_thread(query_df, """
         SELECT r.ingredient, r.unit,
                sum(r.qty_per_unit) AS demand_per_unit
         FROM recipe_master r
@@ -28,7 +29,7 @@ def get_warehouse(
     """)
 
     # Latest warehouse stock
-    stock_df = query_df("""
+    task_stock = asyncio.to_thread(query_df, """
         SELECT ingredient, sum(qty_available) AS warehouse_stock, unit
         FROM fact_warehouse_stock
         WHERE (warehouse, ingredient, snapshot_time) IN (
@@ -37,6 +38,8 @@ def get_warehouse(
         )
         GROUP BY ingredient, unit
     """)
+
+    demand_df, stock_df = await asyncio.gather(task_demand, task_stock)
 
     if demand_df.empty:
         return []

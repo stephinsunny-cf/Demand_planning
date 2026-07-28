@@ -4,40 +4,33 @@ from backend.auth import get_current_user, UserContext, require_role
 from backend.database import query_df
 from datetime import date, timedelta
 import pandas as pd
+import asyncio
 
 router = APIRouter()
 
 @router.get("/variance")
-def get_variance(
+async def get_variance(
     start_date: Optional[str] = None,
     end_date:   Optional[str] = None,
     outlet:     Optional[str] = None,
     ingredient: Optional[str] = None,
     user: UserContext = Depends(require_role("super_admin", "planning_manager", "demand_planner")),
 ):
-    # Fetch variance settings
-    settings_df = query_df("SELECT * FROM variance_settings")
-    settings = {}
-    fallback = {'green_threshold': 5.0, 'yellow_threshold': 15.0}
-    
-    for _, row in settings_df.iterrows():
-        if row['ingredient'] == '*':
-            fallback = {'green_threshold': float(row['green_threshold']), 'yellow_threshold': float(row['yellow_threshold'])}
-        else:
-            settings[row['ingredient'].lower()] = {'green_threshold': float(row['green_threshold']), 'yellow_threshold': float(row['yellow_threshold'])}
+    # Fetch variance settings, mapped ingredients, and fact variance concurrently
+    task_settings = asyncio.to_thread(query_df, "SELECT * FROM variance_settings")
+    task_mapped = asyncio.to_thread(query_df, "SELECT DISTINCT lower(ingredient) as ingredient FROM recipe_master")
 
-    # Fetch mapped ingredients from recipe_master
-    mapped_df = query_df("SELECT DISTINCT lower(ingredient) as ingredient FROM recipe_master")
-    mapped_ingredients = set(mapped_df['ingredient'].tolist()) if not mapped_df.empty else set()
-
-    # Fetch fact_variance
     where = []
+    params = []
     if start_date and end_date:
-        where.append(f"date >= '{start_date}' AND date <= '{end_date}'")
+        where.append("date >= %s AND date <= %s")
+        params.extend([start_date, end_date])
     if outlet:
-        where.append(f"lower(outlet) = lower('{outlet}')")
+        where.append("lower(outlet) = lower(%s)")
+        params.append(outlet)
     if ingredient:
-        where.append(f"lower(ingredient) LIKE lower('%{ingredient}%')")
+        where.append("lower(ingredient) LIKE lower(%s)")
+        params.append(f"%{ingredient}%")
 
     where_clause = f"WHERE {' AND '.join(where)}" if where else ""
     
@@ -52,8 +45,22 @@ def get_variance(
         ORDER BY variance_qty DESC
         LIMIT 5000
     """
-    df = query_df(sql)
     
+    task_variance = asyncio.to_thread(query_df, sql, tuple(params) if params else None)
+
+    settings_df, mapped_df, df = await asyncio.gather(task_settings, task_mapped, task_variance)
+
+    settings = {}
+    fallback = {'green_threshold': 5.0, 'yellow_threshold': 15.0}
+    
+    for _, row in settings_df.iterrows():
+        if row['ingredient'] == '*':
+            fallback = {'green_threshold': float(row['green_threshold']), 'yellow_threshold': float(row['yellow_threshold'])}
+        else:
+            settings[row['ingredient'].lower()] = {'green_threshold': float(row['green_threshold']), 'yellow_threshold': float(row['yellow_threshold'])}
+
+    mapped_ingredients = set(mapped_df['ingredient'].tolist()) if not mapped_df.empty else set()
+
     if df.empty:
         return []
         

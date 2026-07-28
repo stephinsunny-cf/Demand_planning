@@ -1,15 +1,22 @@
 """backend/routers/sales.py — GET /api/sales and /api/sales/summary"""
 
+import asyncio
 from datetime import date, timedelta
 from typing import Optional
 from fastapi import APIRouter, Depends, Query
 import pandas as pd
+
 from backend.database import query_df
 from backend.auth import get_current_user, UserContext, require_role
 from backend.utils import safe_json_response
 
 router = APIRouter()
 
+def get_end_date_plus_1(end_date_str: str) -> str:
+    try:
+        return str(date.fromisoformat(end_date_str) + timedelta(days=1))
+    except ValueError:
+        return str(date.today() + timedelta(days=1))
 
 @router.get("/sales/pos")
 def get_sales_pos(
@@ -18,29 +25,40 @@ def get_sales_pos(
     brand:      Optional[str] = None,
     outlet:     Optional[str] = None,
     city:       Optional[str] = None,
-    sku:        Optional[str] = None, # maps to item_name in POS
+    sku:        Optional[str] = None,
     user: UserContext = Depends(require_role("super_admin", "planning_manager", "demand_planner")),
 ):
     if not start_date or not end_date:
-        max_date_df = query_df("SELECT MAX(CAST(created_at_ist AS DATE)) as max_date FROM pos_orders")
+        max_date_df = query_df("SELECT MAX(created_at_ist) as max_date FROM pos_orders")
         if not max_date_df.empty and max_date_df["max_date"].iloc[0] is not None:
-            latest = __import__("pandas").to_datetime(max_date_df["max_date"].iloc[0]).date()
+            latest = pd.to_datetime(max_date_df["max_date"].iloc[0]).date()
             if not end_date: end_date = str(latest)
             if not start_date: start_date = str(latest - timedelta(days=30))
         else:
             if not end_date: end_date = str(date.today())
             if not start_date: start_date = str(date.today() - timedelta(days=30))
 
-    where = [f"CAST(o.created_at_ist AS DATE) >= '{start_date}'", f"CAST(o.created_at_ist AS DATE) <= '{end_date}'"]
-    if brand:  where.append(f"lower(o.brand_name) = lower('{brand}')")
-    if outlet: where.append(f"lower(o.store_name) = lower('{outlet}')")
-    if city:   where.append(f"lower(o.city) = lower('{city}')")
-    if sku:    where.append(f"lower(i.item_name) LIKE lower('%{sku}%')")
+    end_date_plus_1 = get_end_date_plus_1(end_date)
+    where = ["o.created_at_ist >= %s", "o.created_at_ist < %s"]
+    params = [start_date, end_date_plus_1]
+
+    if brand:  
+        where.append("lower(o.brand_name) = lower(%s)")
+        params.append(brand)
+    if outlet: 
+        where.append("lower(o.store_name) = lower(%s)")
+        params.append(outlet)
+    if city:   
+        where.append("lower(o.city) = lower(%s)")
+        params.append(city)
+    if sku:    
+        where.append("lower(i.item_name) LIKE lower(%s)")
+        params.append(f"%{sku}%")
 
     sql = f"""
         SELECT CAST(o.created_at_ist AS DATE) as date, i.item_name as sku, o.brand_name as brand, o.store_name as outlet, o.city,
-               sum(CAST(REPLACE(CAST(i.quantity AS TEXT), ',', '') AS NUMERIC)) AS qty_sold,
-               sum(CAST(REPLACE(CAST(i.total_price AS TEXT), ',', '') AS NUMERIC)) AS revenue,
+               sum(i.quantity) AS qty_sold,
+               sum(i.total_price) AS revenue,
                count(DISTINCT o.id) AS order_count
         FROM pos_order_items i
         JOIN pos_orders o ON i.order_id = o.id
@@ -49,58 +67,63 @@ def get_sales_pos(
         ORDER BY date DESC
         LIMIT 5000
     """
-    import pandas as pd
-    df = query_df(sql)
+    
+    df = query_df(sql, tuple(params))
     df = df.where(pd.notnull(df), None)
     return safe_json_response(df.to_dict(orient="records") if not df.empty else [])
 
 
 @router.get("/sales/pos/summary")
-def get_sales_pos_summary(
+async def get_sales_pos_summary(
     start_date: Optional[str] = None,
     end_date:   Optional[str] = None,
     user: UserContext = Depends(require_role("super_admin", "planning_manager", "demand_planner")),
 ):
     if not start_date or not end_date:
-        max_date_df = query_df("SELECT MAX(CAST(created_at_ist AS DATE)) as max_date FROM pos_orders")
+        max_date_df = query_df("SELECT MAX(created_at_ist) as max_date FROM pos_orders")
         if not max_date_df.empty and max_date_df["max_date"].iloc[0] is not None:
-            latest = __import__("pandas").to_datetime(max_date_df["max_date"].iloc[0]).date()
+            latest = pd.to_datetime(max_date_df["max_date"].iloc[0]).date()
             if not end_date: end_date = str(latest)
             if not start_date: start_date = str(latest - timedelta(days=30))
         else:
             if not end_date: end_date = str(date.today())
             if not start_date: start_date = str(date.today() - timedelta(days=30))
 
-    totals = query_df(f"""
-        SELECT sum(CAST(REPLACE(CAST(total_amount AS TEXT), ',', '') AS NUMERIC)) AS total_revenue,
-               count(id) AS total_orders
-        FROM pos_orders
-        WHERE CAST(created_at_ist AS DATE) >= '{start_date}' AND CAST(created_at_ist AS DATE) <= '{end_date}'
-    """)
+    end_date_plus_1 = get_end_date_plus_1(end_date)
+    sql_params = (start_date, end_date_plus_1)
 
-    unique_skus_df = query_df(f"""
+    task_totals = asyncio.to_thread(query_df, """
+        SELECT sum(total_amount) AS total_revenue, count(id) AS total_orders
+        FROM pos_orders
+        WHERE created_at_ist >= %s AND created_at_ist < %s
+    """, sql_params)
+
+    task_unique = asyncio.to_thread(query_df, """
         SELECT count(DISTINCT i.item_name) AS unique_skus
         FROM pos_order_items i
         JOIN pos_orders o ON i.order_id = o.id
-        WHERE CAST(o.created_at_ist AS DATE) >= '{start_date}' AND CAST(o.created_at_ist AS DATE) <= '{end_date}'
-    """)
+        WHERE o.created_at_ist >= %s AND o.created_at_ist < %s
+    """, sql_params)
 
-    top_skus = query_df(f"""
-        SELECT i.item_name as sku, sum(CAST(REPLACE(CAST(i.quantity AS TEXT), ',', '') AS NUMERIC)) AS total_qty, sum(CAST(REPLACE(CAST(i.total_price AS TEXT), ',', '') AS NUMERIC)) AS total_revenue
+    task_top = asyncio.to_thread(query_df, """
+        SELECT i.item_name as sku, sum(i.quantity) AS total_qty, sum(i.total_price) AS total_revenue
         FROM pos_order_items i
         JOIN pos_orders o ON i.order_id = o.id
-        WHERE CAST(o.created_at_ist AS DATE) >= '{start_date}' AND CAST(o.created_at_ist AS DATE) <= '{end_date}'
+        WHERE o.created_at_ist >= %s AND o.created_at_ist < %s
         GROUP BY i.item_name ORDER BY total_qty DESC LIMIT 10
-    """)
+    """, sql_params)
 
-    by_brand = query_df(f"""
-        SELECT brand_name as brand, sum(CAST(REPLACE(CAST(total_amount AS TEXT), ',', '') AS NUMERIC)) AS revenue, count(id) AS orders
+    task_brand = asyncio.to_thread(query_df, """
+        SELECT brand_name as brand, sum(total_amount) AS revenue, count(id) AS orders
         FROM pos_orders
-        WHERE CAST(created_at_ist AS DATE) >= '{start_date}' AND CAST(created_at_ist AS DATE) <= '{end_date}'
+        WHERE created_at_ist >= %s AND created_at_ist < %s
         GROUP BY brand_name ORDER BY revenue DESC
-    """)
+    """, sql_params)
 
-    import pandas as pd
+    totals, unique_skus_df, top_skus, by_brand = await asyncio.gather(
+        task_totals, task_unique, task_top, task_brand
+    )
+
     total_rev = float(totals["total_revenue"].iloc[0]) if not totals.empty and pd.notna(totals["total_revenue"].iloc[0]) else 0
     total_ord = int(totals["total_orders"].iloc[0]) if not totals.empty and pd.notna(totals["total_orders"].iloc[0]) else 0
     unique_skus = int(unique_skus_df["unique_skus"].iloc[0]) if not unique_skus_df.empty and pd.notna(unique_skus_df["unique_skus"].iloc[0]) else 0
@@ -126,21 +149,30 @@ def get_sales(
     user: UserContext = Depends(require_role("super_admin", "planning_manager", "demand_planner")),
 ):
     if not start_date or not end_date:
-        # Get the latest date we have data for, instead of today's date (which might be empty)
         max_date_df = query_df("SELECT max(date) as max_date FROM fact_daily_sales")
         if not max_date_df.empty and max_date_df["max_date"].iloc[0] is not None:
-            latest = __import__("pandas").to_datetime(max_date_df["max_date"].iloc[0]).date()
+            latest = pd.to_datetime(max_date_df["max_date"].iloc[0]).date()
             if not end_date: end_date = str(latest)
             if not start_date: start_date = str(latest - timedelta(days=30))
         else:
             if not end_date: end_date = str(date.today())
             if not start_date: start_date = str(date.today() - timedelta(days=30))
 
-    where = [f"date >= '{start_date}'", f"date <= '{end_date}'"]
-    if brand:  where.append(f"lower(brand) = lower('{brand}')")
-    if outlet: where.append(f"lower(outlet) = lower('{outlet}')")
-    if city:   where.append(f"lower(city) = lower('{city}')")
-    if sku:    where.append(f"lower(sku) LIKE lower('%{sku}%')")
+    where = ["date >= %s", "date <= %s"]
+    params = [start_date, end_date]
+
+    if brand:  
+        where.append("lower(brand) = lower(%s)")
+        params.append(brand)
+    if outlet: 
+        where.append("lower(outlet) = lower(%s)")
+        params.append(outlet)
+    if city:   
+        where.append("lower(city) = lower(%s)")
+        params.append(city)
+    if sku:    
+        where.append("lower(sku) LIKE lower(%s)")
+        params.append(f"%{sku}%")
 
     sql = f"""
         SELECT date, sku, brand, outlet, city,
@@ -153,14 +185,13 @@ def get_sales(
         ORDER BY date DESC
         LIMIT 5000
     """
-    import pandas as pd
-    df = query_df(sql)
+    df = query_df(sql, tuple(params))
     df = df.where(pd.notnull(df), None)
     return safe_json_response(df.to_dict(orient="records") if not df.empty else [])
 
 
 @router.get("/sales/summary")
-def get_sales_summary(
+async def get_sales_summary(
     start_date: Optional[str] = None,
     end_date:   Optional[str] = None,
     user: UserContext = Depends(require_role("super_admin", "planning_manager", "demand_planner")),
@@ -168,36 +199,39 @@ def get_sales_summary(
     if not start_date or not end_date:
         max_date_df = query_df("SELECT max(date) as max_date FROM fact_daily_sales")
         if not max_date_df.empty and max_date_df["max_date"].iloc[0] is not None:
-            latest = __import__("pandas").to_datetime(max_date_df["max_date"].iloc[0]).date()
+            latest = pd.to_datetime(max_date_df["max_date"].iloc[0]).date()
             if not end_date: end_date = str(latest)
             if not start_date: start_date = str(latest - timedelta(days=30))
         else:
             if not end_date: end_date = str(date.today())
             if not start_date: start_date = str(date.today() - timedelta(days=30))
 
-    totals = query_df(f"""
+    sql_params = (start_date, end_date)
+
+    task_totals = asyncio.to_thread(query_df, """
         SELECT sum(revenue) AS total_revenue,
                sum(order_count) AS total_orders,
                count(DISTINCT sku) AS unique_skus
         FROM fact_daily_sales
-        WHERE date >= '{start_date}' AND date <= '{end_date}'
-    """)
+        WHERE date >= %s AND date <= %s
+    """, sql_params)
 
-    top_skus = query_df(f"""
+    task_top = asyncio.to_thread(query_df, """
         SELECT sku, sum(qty_sold) AS total_qty, sum(revenue) AS total_revenue
         FROM fact_daily_sales
-        WHERE date >= '{start_date}' AND date <= '{end_date}'
+        WHERE date >= %s AND date <= %s
         GROUP BY sku ORDER BY total_qty DESC LIMIT 10
-    """)
+    """, sql_params)
 
-    by_brand = query_df(f"""
+    task_brand = asyncio.to_thread(query_df, """
         SELECT brand, sum(revenue) AS revenue, sum(order_count) AS orders
         FROM fact_daily_sales
-        WHERE date >= '{start_date}' AND date <= '{end_date}'
+        WHERE date >= %s AND date <= %s
         GROUP BY brand ORDER BY revenue DESC
-    """)
+    """, sql_params)
 
-    import pandas as pd
+    totals, top_skus, by_brand = await asyncio.gather(task_totals, task_top, task_brand)
+
     total_rev = float(totals["total_revenue"].iloc[0]) if not totals.empty and pd.notna(totals["total_revenue"].iloc[0]) else 0
     total_ord = int(totals["total_orders"].iloc[0]) if not totals.empty and pd.notna(totals["total_orders"].iloc[0]) else 0
     unique_skus = int(totals["unique_skus"].iloc[0]) if not totals.empty and pd.notna(totals["unique_skus"].iloc[0]) else 0
