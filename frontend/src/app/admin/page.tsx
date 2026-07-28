@@ -6,7 +6,7 @@ import Link from 'next/link';
 import api from '@/lib/api';
 import { useCachedApi } from '@/hooks/useCachedApi';
 import { 
-  Users, Shield, UserPlus, RefreshCw, KeyRound, UserX, 
+  Users, Shield, UserPlus, RefreshCw, KeyRound, UserX, UserCheck,
   CheckCircle2, AlertTriangle, Play, Server, FileText, ArrowLeft,
   ChevronDown, Check
 } from 'lucide-react';
@@ -169,6 +169,25 @@ export default function AdminPage() {
           mutate(true);
         } catch (err: any) {
           setBannerError(err.response?.data?.detail || err.message || 'Failed to deactivate user');
+        }
+      }
+    });
+  };
+
+  const handleReactivate = async (userId: string, email: string) => {
+    setConfirmDialog({
+      isOpen: true,
+      title: 'Reactivate User',
+      message: `Reactivate ${email}? They will be able to log in again immediately.`,
+      isDestructive: false,
+      onConfirm: async () => {
+        setConfirmDialog(null);
+        try {
+          await api.put(`/api/admin/users/${userId}/reactivate`);
+          setBannerSuccess(`User ${email} reactivated successfully.`);
+          mutate(true);
+        } catch (err: any) {
+          setBannerError(err.response?.data?.detail || err.message || 'Failed to reactivate user');
         }
       }
     });
@@ -343,13 +362,23 @@ export default function AdminPage() {
                           >
                             <Shield className="w-4 h-4" />
                           </button>
-                          <button
-                            onClick={() => handleDeactivate(u.user_id, u.email)}
-                            title="Deactivate Account"
-                            className="p-1.5 bg-rose-600/20 hover:bg-rose-600/30 text-rose-300 rounded-lg transition-colors"
-                          >
-                            <UserX className="w-4 h-4" />
-                          </button>
+                          {u.is_active ? (
+                            <button
+                              onClick={() => handleDeactivate(u.user_id, u.email)}
+                              title="Deactivate Account"
+                              className="p-1.5 bg-rose-600/20 hover:bg-rose-600/30 text-rose-300 rounded-lg transition-colors"
+                            >
+                              <UserX className="w-4 h-4" />
+                            </button>
+                          ) : (
+                            <button
+                              onClick={() => handleReactivate(u.user_id, u.email)}
+                              title="Reactivate Account"
+                              className="p-1.5 bg-emerald-600/20 hover:bg-emerald-600/30 text-emerald-300 rounded-lg transition-colors"
+                            >
+                              <UserCheck className="w-4 h-4" />
+                            </button>
+                          )}
                         </>
                       )}
                     </td>

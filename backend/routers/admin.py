@@ -303,6 +303,21 @@ async def deactivate_user(
     return {"message": f"User {user_id} deactivated and session revoked."}
 
 
+@router.put("/admin/users/{user_id}/reactivate")
+async def reactivate_user(
+    user_id: str,
+    caller: UserContext = Depends(require_role("super_admin"))
+):
+    """Reactivate a previously deactivated user account (Super Admin only)."""
+    with get_db() as conn:
+        with conn.cursor() as cur:
+            cur.execute("UPDATE user_profiles SET is_active = TRUE, updated_at = CURRENT_TIMESTAMP WHERE user_id = %s", (user_id,))
+            conn.commit()
+
+    clear_user_profile_cache(user_id)
+    return {"message": f"User {user_id} reactivated successfully."}
+
+
 @router.post("/auth/reset-password")
 async def reset_password(
     req: ResetPasswordRequest,
