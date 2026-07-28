@@ -63,6 +63,27 @@ export default function AdminPage() {
     onConfirm: (val: string) => void;
   } | null>(null);
 
+  // Change Role Modal State
+  const [changeRoleDialog, setChangeRoleDialog] = useState<{
+    isOpen: boolean;
+    userId: string;
+    email: string;
+    currentRole: string;
+    selectedRole: string;
+  } | null>(null);
+  const [changeRoleDropdownOpen, setChangeRoleDropdownOpen] = useState(false);
+  const changeRoleDropdownRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    function handleClickOutsideChangeRole(event: MouseEvent) {
+      if (changeRoleDropdownRef.current && !changeRoleDropdownRef.current.contains(event.target as Node)) {
+        setChangeRoleDropdownOpen(false);
+      }
+    }
+    document.addEventListener('mousedown', handleClickOutsideChangeRole);
+    return () => document.removeEventListener('mousedown', handleClickOutsideChangeRole);
+  }, []);
+
   // Status & Error Banners
   const [bannerSuccess, setBannerSuccess] = useState('');
   const [bannerError, setBannerError] = useState('');
@@ -117,25 +138,21 @@ export default function AdminPage() {
     });
   };
 
-  const handleRoleChange = async (userId: string, currentRole: string) => {
-    setPromptDialog({
-      isOpen: true,
-      title: 'Change Role',
-      message: `Change role for user (current: ${currentRole}). Enter: reader, editor, admin, or super_admin`,
-      value: currentRole,
-      onConfirm: async (nextRole) => {
-        setPromptDialog(null);
-        const roles = ['reader', 'editor', 'admin', 'super_admin'];
-        if (!nextRole || !roles.includes(nextRole.toLowerCase())) return;
-        try {
-          await api.put(`/api/admin/users/${userId}/role`, { role: nextRole.toLowerCase() });
-          setBannerSuccess(`User role updated to ${nextRole}.`);
-          mutate(true);
-        } catch (err: any) {
-          setBannerError(err.response?.data?.detail || err.message || 'Failed to update role');
-        }
-      }
-    });
+  const handleRoleChange = async (userId: string, currentRole: string, email: string) => {
+    setChangeRoleDialog({ isOpen: true, userId, email, currentRole, selectedRole: currentRole });
+  };
+
+  const submitRoleChange = async () => {
+    if (!changeRoleDialog) return;
+    const { userId, selectedRole } = changeRoleDialog;
+    setChangeRoleDialog(null);
+    try {
+      await api.put(`/api/admin/users/${userId}/role`, { role: selectedRole });
+      setBannerSuccess(`User role updated to ${selectedRole}.`);
+      mutate(true);
+    } catch (err: any) {
+      setBannerError(err.response?.data?.detail || err.message || 'Failed to update role');
+    }
   };
 
   const handleDeactivate = async (userId: string, email: string) => {
@@ -320,7 +337,7 @@ export default function AdminPage() {
                       {isSuperAdmin && (
                         <>
                           <button
-                            onClick={() => handleRoleChange(u.user_id, u.role)}
+                            onClick={() => handleRoleChange(u.user_id, u.role, u.email)}
                             title="Change User Role"
                             className="p-1.5 bg-blue-600/20 hover:bg-blue-600/30 text-blue-300 rounded-lg transition-colors"
                           >
@@ -493,6 +510,87 @@ export default function AdminPage() {
               >
                 Confirm
               </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Change Role Modal */}
+      {changeRoleDialog?.isOpen && (
+        <div className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center p-4 z-50" onClick={() => setChangeRoleDialog(null)}>
+          <div className="bg-slate-800 border border-slate-700 rounded-xl p-6 max-w-md w-full shadow-2xl" onClick={(e) => e.stopPropagation()}>
+            <h3 className="text-lg font-bold text-white mb-2 flex items-center gap-2">
+              <Shield className="w-5 h-5 text-blue-400" /> Change Role
+            </h3>
+            <p className="text-xs text-slate-400 mb-6">
+              Changing role for: <span className="text-white font-medium">{changeRoleDialog.email}</span>
+              <br />Current role: <span className="text-amber-400 font-medium uppercase">{changeRoleDialog.currentRole}</span>
+            </p>
+
+            <div className="space-y-4">
+              <div>
+                <label className="block text-xs font-semibold text-slate-300 mb-1">New Role</label>
+                <div className="relative" ref={changeRoleDropdownRef}>
+                  <button
+                    type="button"
+                    onClick={() => setChangeRoleDropdownOpen(!changeRoleDropdownOpen)}
+                    className="w-full flex items-center justify-between bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-blue-500 transition-all hover:border-slate-600"
+                    style={{ height: '38px' }}
+                  >
+                    <span className="truncate capitalize">{changeRoleDialog.selectedRole.replace('_', ' ')}</span>
+                    <ChevronDown size={16} className={`text-slate-400 transition-transform ${changeRoleDropdownOpen ? 'rotate-180' : ''}`} />
+                  </button>
+
+                  {changeRoleDropdownOpen && (
+                    <div className="absolute z-50 mt-1 w-full bg-slate-900 border border-slate-700 rounded-lg shadow-xl overflow-hidden origin-top">
+                      <div className="p-1 space-y-1">
+                        {[
+                          { value: 'reader', label: 'Reader' },
+                          { value: 'editor', label: 'Editor' },
+                          ...(isSuperAdmin ? [
+                            { value: 'admin', label: 'Admin' },
+                            { value: 'super_admin', label: 'Super Admin' }
+                          ] : [])
+                        ].map((option) => {
+                          const isSelected = changeRoleDialog.selectedRole === option.value;
+                          return (
+                            <button
+                              key={option.value}
+                              type="button"
+                              onClick={() => {
+                                setChangeRoleDialog({ ...changeRoleDialog, selectedRole: option.value });
+                                setChangeRoleDropdownOpen(false);
+                              }}
+                              className={`w-full flex items-center justify-between px-3 py-2 cursor-pointer rounded-lg text-left text-sm transition-colors
+                                ${isSelected ? 'bg-[#011B4D] text-white' : 'text-slate-300 hover:bg-slate-800'}`}
+                            >
+                              <span>{option.label}</span>
+                              {isSelected && <Check size={16} />}
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              <div className="flex justify-end gap-3 pt-4 border-t border-slate-700">
+                <button
+                  type="button"
+                  onClick={() => setChangeRoleDialog(null)}
+                  className="px-4 py-2 bg-slate-700 hover:bg-slate-600 text-slate-300 rounded-lg text-sm font-medium"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  onClick={submitRoleChange}
+                  className="px-4 py-2 bg-[#011B4D] hover:bg-[#02266b] text-white rounded-lg text-sm font-medium"
+                >
+                  Update Role
+                </button>
+              </div>
             </div>
           </div>
         </div>
