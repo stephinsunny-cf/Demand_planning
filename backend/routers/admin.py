@@ -220,6 +220,7 @@ async def create_user(
 @router.post("/admin/users/{user_id}/resend-temp-password")
 async def resend_temp_password(
     user_id: str,
+    background_tasks: BackgroundTasks,
     caller: UserContext = Depends(require_role("admin", "super_admin"))
 ):
     """Regenerate new temporary password and force must_reset_password = True."""
@@ -248,7 +249,7 @@ async def resend_temp_password(
                 cur.execute("UPDATE user_profiles SET must_reset_password = TRUE, updated_at = CURRENT_TIMESTAMP WHERE user_id = %s", (user_id,))
                 conn.commit()
 
-        send_temp_password_email(target_email, new_temp_password)
+        background_tasks.add_task(send_temp_password_email, target_email, new_temp_password)
         clear_user_profile_cache(user_id)
 
         return {"message": f"New temporary password generated and sent to {target_email}."}
