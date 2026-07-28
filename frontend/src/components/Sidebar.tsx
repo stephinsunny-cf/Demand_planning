@@ -21,6 +21,7 @@ const NAV = [
   { href: '/tracker',     label: 'Tracker',      icon: FileText,        page: 'tracker'     },
   { href: '/alerts',      label: 'Alerts',       icon: Bell,            page: 'alerts'      },
   { href: '/reports',     label: 'Reports',      icon: FileText,        page: 'reports'     },
+  { href: '/settings',    label: 'Settings',     icon: Settings,        page: 'dashboard'   },
   { href: '/admin',       label: 'Admin',        icon: Settings,        page: 'admin'       },
 ]
 

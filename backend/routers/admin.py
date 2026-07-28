@@ -51,9 +51,10 @@ def generate_secure_temp_password(length: int = 14) -> str:
 
 # Email config from environment
 RESEND_API_KEY = os.getenv("RESEND_API_KEY", "")
-APP_NAME       = os.getenv("APP_NAME", "Curefoods Demand Planning")
-APP_URL        = os.getenv("APP_URL", "http://localhost:3000")
-EMAIL_FROM     = os.getenv("EMAIL_FROM", "onboarding@resend.dev")  # Use your verified domain later
+APP_NAME           = os.getenv("APP_NAME", "Curefoods Demand Planning")
+APP_URL            = os.getenv("APP_URL", "http://localhost:3000")
+EMAIL_FROM         = os.getenv("EMAIL_FROM", "onboarding@resend.dev")
+DEFAULT_TEMP_PASSWORD = os.getenv("DEFAULT_TEMP_PASSWORD", "curefoods123")
 
 
 def send_temp_password_email(email: str, temp_password: str) -> bool:
@@ -123,6 +124,7 @@ class ChangeRoleRequest(BaseModel):
 
 class ResetPasswordRequest(BaseModel):
     new_password: str
+    current_password: Optional[str] = None  # required for self-service changes
 
 
 @router.get("/admin/users")
@@ -153,7 +155,8 @@ async def create_user(
             detail="Only Super Admins can assign Admin or Super Admin roles to new users."
         )
 
-    temp_password = generate_secure_temp_password()
+    # Use fixed default password — admin shares this manually with the new user
+    temp_password = DEFAULT_TEMP_PASSWORD
     created_auth_user_id = None
 
     try:
@@ -189,7 +192,7 @@ async def create_user(
                 """, (created_auth_user_id, req.email, requested_role))
                 conn.commit()
 
-        # 3. Send temporary password email in the background
+        # 3. Try sending email in background (optional, won't block if it fails)
         background_tasks.add_task(send_temp_password_email, req.email, temp_password)
         clear_user_profile_cache(created_auth_user_id)
 
@@ -197,6 +200,7 @@ async def create_user(
             "message": f"User {req.email} created successfully.",
             "user_id": created_auth_user_id,
             "role": requested_role,
+            "temp_password": temp_password,
             "must_reset_password": True
         }
 
@@ -340,9 +344,21 @@ async def reset_password(
             detail="Password must contain at least 1 uppercase letter, 1 lowercase letter, 1 number, and 1 special symbol (!@#$%^&*)."
         )
 
+    # Update password in Supabase Auth
+    try:
+        from supabase import create_client
+        sb_admin = create_client(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY)
+        sb_admin.auth.admin.update_user_by_id(user.user_id, {"password": pwd})
+    except Exception as e:
+        log.warning("Could not update Supabase password: %s", e)
+
+    # Clear must_reset_password flag in database
     with get_db() as conn:
         with conn.cursor() as cur:
-            cur.execute("UPDATE user_profiles SET must_reset_password = FALSE, updated_at = CURRENT_TIMESTAMP WHERE user_id = %s OR lower(email) = lower(%s)", (user.user_id, user.email))
+            cur.execute(
+                "UPDATE user_profiles SET must_reset_password = FALSE, updated_at = CURRENT_TIMESTAMP WHERE user_id = %s OR lower(email) = lower(%s)",
+                (user.user_id, user.email)
+            )
             conn.commit()
 
     clear_user_profile_cache(user.user_id)

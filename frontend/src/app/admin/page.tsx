@@ -103,7 +103,8 @@ export default function AdminPage() {
 
     try {
       const res = await api.post('/api/admin/users', { email: newEmail, role: newRole });
-      setBannerSuccess(`User ${newEmail} created! A temporary password was emailed.`);
+      const defaultPwd = res.data?.temp_password || 'curefoods123';
+      setBannerSuccess(`✅ User ${newEmail} created! Share this default password with them: ${defaultPwd} — They must change it on first login.`);
       setIsModalOpen(false);
       setNewEmail('');
       setNewRole('editor');
