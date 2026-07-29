@@ -9,7 +9,7 @@ import time
 import logging
 from typing import Optional
 
-from fastapi import Depends, HTTPException, status
+from fastapi import Depends, HTTPException, status, Request
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 
 log = logging.getLogger(__name__)
@@ -152,13 +152,32 @@ async def get_current_user(
 
 def require_role(*roles: str):
     """FastAPI dependency factory enforcing server-side role security boundaries."""
-    async def checker(user: UserContext = Depends(get_current_user)) -> UserContext:
+    async def checker(request: Request, user: UserContext = Depends(get_current_user)) -> UserContext:
         if user.role == "super_admin":
             return user
-        if user.role not in roles:
-            raise HTTPException(
-                status_code=status.HTTP_403_FORBIDDEN,
-                detail=f"Role '{user.role}' does not have access. Required: {list(roles)}",
-            )
-        return user
+            
+        if user.role in roles:
+            return user
+            
+        # Role mapping for legacy business endpoints
+        if user.role == "admin":
+            # Admin can do everything except strict super_admin routes
+            if roles != ("super_admin",):
+                return user
+                
+        if user.role == "editor":
+            # Editor can do business tasks, but cannot access admin/super_admin routes
+            if "admin" not in roles and "super_admin" not in roles:
+                return user
+                
+        if user.role == "reader":
+            # Reader can only access GET endpoints for business tasks
+            if request.method == "GET":
+                if "admin" not in roles and "super_admin" not in roles:
+                    return user
+
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail=f"Role '{user.role}' does not have access. Required: {list(roles)}",
+        )
     return checker

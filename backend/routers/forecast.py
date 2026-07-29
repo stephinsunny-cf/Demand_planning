@@ -144,11 +144,11 @@ def get_forecast_all(
         )
         SELECT 
             d.sku_code,
-            d.sku_name,
+            d.sku_name AS sku,
             COALESCE(fa.outlet, 'Network-Wide') AS outlet,
             COALESCE(fa.agg_qty, 0) AS total_predicted
         FROM dim_sku d
-        LEFT JOIN forecast_agg fa ON lower(d.sku_name) = lower(fa.sku)
+        LEFT JOIN forecast_agg fa ON d.sku_code = fa.sku
         ORDER BY total_predicted DESC
         LIMIT 5000
     """)

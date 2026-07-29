@@ -65,8 +65,15 @@ export function useAuth() {
       setUser({ id: 'mock_user', email, role: 'super_admin' })
       return
     }
-    const { error } = await supabase.auth.signInWithPassword({ email, password })
+    const { data, error } = await supabase.auth.signInWithPassword({ email, password })
     if (error) throw error
+    
+    // Explicitly set the token here to avoid a race condition with onAuthStateChange
+    // which can cause the profile fetch to trigger a 401 and redirect back to login.
+    if (data?.session) {
+      localStorage.setItem('sb-token', data.session.access_token)
+      document.cookie = `sb-token=${data.session.access_token}; path=/; max-age=86400; SameSite=Lax`
+    }
   }, [])
 
   const signOut = useCallback(async () => {

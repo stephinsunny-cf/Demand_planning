@@ -38,19 +38,19 @@ async def get_supply_plan(
             GROUP BY f.ingredient, d.sku_name, f.outlet
         ),
         latest_stock AS (
-            SELECT kitchen, ingredient AS sku_code, sum(qty_available) AS stock_qty
+            SELECT 'ALL' AS kitchen, ingredient AS sku_code, sum(qty_available) AS stock_qty
             FROM fact_kitchen_stock s
             WHERE (kitchen, ingredient, snapshot_date) IN (
                 SELECT kitchen, ingredient, max(snapshot_date)
                 FROM fact_kitchen_stock
-                WHERE (kitchen, ingredient) IN (SELECT kitchen, sku_code FROM forecast)
+                WHERE ingredient IN (SELECT sku_code FROM forecast)
                 GROUP BY kitchen, ingredient
             )
-            GROUP BY kitchen, ingredient
+            GROUP BY ingredient
         ),
         safety AS (
-            SELECT sku, outlet AS kitchen, safety_stock_qty
-            FROM dim_safety_stock
+            SELECT lower(ingredient) AS sku_lower, (drr * lead_time_days) AS safety_stock_qty
+            FROM procurement_tracker
         )
         SELECT 
             f.sku_code, 
@@ -61,7 +61,7 @@ async def get_supply_plan(
             COALESCE(sf.safety_stock_qty, 0.0) AS safety_stock_qty
         FROM forecast f
         LEFT JOIN latest_stock s ON f.kitchen = s.kitchen AND f.sku_code = s.sku_code
-        LEFT JOIN safety sf ON f.sku = sf.sku AND f.kitchen = sf.kitchen
+        LEFT JOIN safety sf ON lower(f.sku) = sf.sku_lower
     """, params=(today, in_3d))
 
     if plan.empty:

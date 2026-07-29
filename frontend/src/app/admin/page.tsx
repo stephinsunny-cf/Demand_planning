@@ -7,7 +7,7 @@ import Layout from '@/components/Layout';
 import api from '@/lib/api';
 import { useCachedApi } from '@/hooks/useCachedApi';
 import { 
-  Users, Shield, UserPlus, RefreshCw, KeyRound, UserX, UserCheck,
+  Users, Shield, UserPlus, RefreshCw, KeyRound, UserX, UserCheck, Trash2,
   CheckCircle2, AlertTriangle, Play, Server, FileText, ArrowLeft,
   ChevronDown, Check
 } from 'lucide-react';
@@ -96,7 +96,7 @@ export default function AdminPage() {
       const timer = setTimeout(() => {
         setBannerSuccess('');
         setBannerError('');
-      }, 10000);
+      }, 8000);
       return () => clearTimeout(timer);
     }
   }, [bannerSuccess, bannerError]);
@@ -115,7 +115,7 @@ export default function AdminPage() {
 
     try {
       const res = await api.post('/api/admin/users', { email: newEmail, role: newRole });
-      setBannerSuccess(`✅ User ${newEmail} invited! An email has been sent with a magic link.`);
+      setBannerSuccess(`${newEmail} has been added`);
       setIsModalOpen(false);
       setNewEmail('');
       setNewRole('editor');
@@ -141,10 +141,28 @@ export default function AdminPage() {
         setConfirmDialog(null);
         try {
           await api.post(`/api/admin/users/${userId}/resend-invite`);
-          setBannerSuccess(`New invite link emailed to ${email}.`);
+          setBannerSuccess(`Invite link for ${email} has been resent`);
           mutate(true);
         } catch (err: any) {
-          setBannerError(err.response?.data?.detail || err.message || 'Failed to resend temporary password');
+          setBannerError(err.response?.data?.detail || err.message || 'Failed to resend invite link');
+        }
+      }
+    });
+  };
+
+  const handleForcePasswordReset = async (userId: string, email: string) => {
+    setConfirmDialog({
+      isOpen: true,
+      title: 'Force Password Reset',
+      message: `Send a password recovery email to ${email}? This will immediately log them out of all active sessions and force them to set a new password on their next login.`,
+      onConfirm: async () => {
+        setConfirmDialog(null);
+        try {
+          await api.post(`/api/admin/users/${userId}/reset-password`);
+          setBannerSuccess(`Password reset email sent to ${email}`);
+          mutate(true);
+        } catch (err: any) {
+          setBannerError(err.response?.data?.detail || err.message || 'Failed to force password reset');
         }
       }
     });
@@ -160,7 +178,7 @@ export default function AdminPage() {
     setChangeRoleDialog(null);
     try {
       await api.put(`/api/admin/users/${userId}/role`, { role: selectedRole });
-      setBannerSuccess(`User role updated to ${selectedRole}.`);
+      setBannerSuccess(`${email}'s role has been changed to ${selectedRole}`);
       mutate(true);
     } catch (err: any) {
       setBannerError(err.response?.data?.detail || err.message || 'Failed to update role');
@@ -177,7 +195,7 @@ export default function AdminPage() {
         setConfirmDialog(null);
         try {
           await api.put(`/api/admin/users/${userId}/deactivate`);
-          setBannerSuccess(`User ${email} deactivated and session revoked.`);
+          setBannerSuccess(`${email} has been deactivated`);
           mutate(true);
         } catch (err: any) {
           setBannerError(err.response?.data?.detail || err.message || 'Failed to deactivate user');
@@ -196,10 +214,29 @@ export default function AdminPage() {
         setConfirmDialog(null);
         try {
           await api.put(`/api/admin/users/${userId}/reactivate`);
-          setBannerSuccess(`User ${email} reactivated successfully.`);
+          setBannerSuccess(`${email} has been reactivated`);
           mutate(true);
         } catch (err: any) {
           setBannerError(err.response?.data?.detail || err.message || 'Failed to reactivate user');
+        }
+      }
+    });
+  };
+
+  const handleDelete = async (userId: string, email: string) => {
+    setConfirmDialog({
+      isOpen: true,
+      title: 'Permanently Delete User',
+      message: `Are you completely sure you want to permanently delete ${email}? This will destroy their profile and access history. This action CANNOT be undone.`,
+      isDestructive: true,
+      onConfirm: async () => {
+        setConfirmDialog(null);
+        try {
+          await api.delete(`/api/admin/users/${userId}`);
+          setBannerSuccess(`${email} has been permanently deleted`);
+          mutate(true);
+        } catch (err: any) {
+          setBannerError(err.response?.data?.detail || err.message || 'Failed to delete user');
         }
       }
     });
@@ -279,14 +316,14 @@ export default function AdminPage() {
       )}
 
       {bannerError && (
-        <div className="p-4 bg-rose-50 dark:bg-rose-500/10 border border-rose-200 dark:border-rose-500/30 rounded-xl flex items-center space-x-3 text-rose-800 dark:text-rose-300 text-sm">
+        <div className="animate-fade-out-timer p-4 bg-rose-50 dark:bg-rose-500/10 border border-rose-200 dark:border-rose-500/30 rounded-xl flex items-center space-x-3 text-rose-800 dark:text-rose-300 text-sm">
           <AlertTriangle className="w-5 h-5 text-rose-600 dark:text-rose-400 shrink-0" />
           <span>{bannerError}</span>
         </div>
       )}
 
       {bannerSuccess && (
-        <div className="p-4 bg-emerald-50 dark:bg-emerald-500/10 border border-emerald-200 dark:border-emerald-500/30 rounded-xl flex items-center space-x-3 text-emerald-800 dark:text-emerald-300 text-sm">
+        <div className="animate-fade-out-timer p-4 bg-emerald-50 dark:bg-emerald-500/10 border border-emerald-200 dark:border-emerald-500/30 rounded-xl flex items-center space-x-3 text-emerald-800 dark:text-emerald-300 text-sm">
           <CheckCircle2 className="w-5 h-5 text-emerald-600 dark:text-emerald-400 shrink-0" />
           <span>{bannerSuccess}</span>
         </div>
@@ -353,13 +390,23 @@ export default function AdminPage() {
                       )}
                     </td>
                     <td className="px-6 py-4 text-right space-x-2">
-                      <button
-                        onClick={() => handleResendInvite(u.user_id, u.email)}
-                        title="Resend Invite Link"
-                        className="p-1.5 bg-slate-700 hover:bg-slate-600 text-slate-300 rounded-lg transition-colors"
-                      >
-                        <KeyRound className="w-4 h-4" />
-                      </button>
+                      {u.must_reset_password ? (
+                        <button
+                          onClick={() => handleResendInvite(u.user_id, u.email)}
+                          title="Resend Invite Link"
+                          className="p-1.5 bg-slate-700 hover:bg-slate-600 text-slate-300 rounded-lg transition-colors"
+                        >
+                          <KeyRound className="w-4 h-4" />
+                        </button>
+                      ) : (
+                        <button
+                          onClick={() => handleForcePasswordReset(u.user_id, u.email)}
+                          title="Force Password Reset"
+                          className="p-1.5 bg-amber-600/20 hover:bg-amber-600/30 text-amber-300 rounded-lg transition-colors"
+                        >
+                          <KeyRound className="w-4 h-4" />
+                        </button>
+                      )}
 
                       {isSuperAdmin && (
                         <>
@@ -382,11 +429,18 @@ export default function AdminPage() {
                             <button
                               onClick={() => handleReactivate(u.user_id, u.email)}
                               title="Reactivate Account"
-                              className="p-1.5 bg-emerald-600/20 hover:bg-emerald-600/30 text-emerald-300 rounded-lg transition-colors"
+                              className="p-1.5 bg-emerald-600/20 hover:bg-emerald-600/30 text-emerald-400 rounded-lg transition-colors"
                             >
                               <UserCheck className="w-4 h-4" />
                             </button>
                           )}
+                          <button
+                            onClick={() => handleDelete(u.user_id, u.email)}
+                            title="Permanently Delete Account"
+                            className="p-1.5 bg-red-600/20 hover:bg-red-600/30 text-red-400 rounded-lg transition-colors ml-2"
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </button>
                         </>
                       )}
                     </td>

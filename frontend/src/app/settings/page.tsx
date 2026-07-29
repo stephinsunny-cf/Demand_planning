@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { User, Lock, CheckCircle, ShieldAlert, ArrowLeft, KeyRound, Eye, EyeOff } from 'lucide-react';
+import { User, Lock, CheckCircle, ShieldAlert, ArrowLeft, KeyRound, Eye, EyeOff, ChevronDown, ChevronUp } from 'lucide-react';
 import api from '@/lib/api';
 import { useAuth } from '@/hooks/useAuth';
 
@@ -13,6 +13,9 @@ export default function SettingsPage() {
 
   // Profile info
   const [profile, setProfile] = useState<{ email: string; role: string; must_reset_password: boolean } | null>(null);
+
+  // Accordion state
+  const [isPasswordExpanded, setIsPasswordExpanded] = useState(false);
 
   // Password change state
   const [currentPassword, setCurrentPassword] = useState('');
@@ -26,7 +29,7 @@ export default function SettingsPage() {
   const [success, setSuccess] = useState('');
 
   // Password complexity
-  const hasMinLength = newPassword.length >= 12;
+  const hasMinLength = newPassword.length >= 8;
   const hasUpper = /[A-Z]/.test(newPassword);
   const hasLower = /[a-z]/.test(newPassword);
   const hasDigit = /[0-9]/.test(newPassword);
@@ -78,8 +81,9 @@ export default function SettingsPage() {
   };
 
   return (
-    <div className="p-8 max-w-2xl mx-auto space-y-8">
-      <Link href="/dashboard" className="inline-flex items-center gap-2 text-sm font-medium text-slate-500 hover:text-blue-400 transition-colors mb-2">
+    <div className="p-8 w-full space-y-8">
+      <div>
+        <Link href="/dashboard" className="inline-flex items-center gap-2 text-sm font-medium text-slate-500 hover:text-blue-400 transition-colors mb-2">
         <ArrowLeft className="w-4 h-4" /> Back to Dashboard
       </Link>
 
@@ -89,7 +93,9 @@ export default function SettingsPage() {
         </h1>
         <p className="text-sm text-slate-400 mt-1">Manage your account information and security settings</p>
       </div>
+      </div>
 
+      <div className="max-w-2xl mx-auto space-y-8">
       {/* Profile Info Card */}
       <div className="bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 shadow-sm overflow-hidden">
         <div className="px-6 py-4 border-b border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/50">
@@ -106,8 +112,8 @@ export default function SettingsPage() {
           </div>
           <div className="flex items-center justify-between">
             <span className="text-sm text-slate-500 dark:text-slate-400">Role</span>
-            <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold uppercase ${roleColor[profile?.role || 'reader']}`}>
-              {roleLabel[profile?.role || 'reader'] || profile?.role}
+            <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold uppercase ${roleColor[profile?.role || user?.role || 'reader']}`}>
+              {roleLabel[profile?.role || user?.role || 'reader'] || profile?.role || user?.role}
             </span>
           </div>
           <div className="flex items-center justify-between">
@@ -127,13 +133,22 @@ export default function SettingsPage() {
 
       {/* Change Password Card */}
       <div className="bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 shadow-sm overflow-hidden">
-        <div className="px-6 py-4 border-b border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/50">
-          <h2 className="text-base font-semibold text-slate-900 dark:text-white flex items-center gap-2">
-            <Lock className="w-4 h-4 text-blue-400" /> Change Password
-          </h2>
-          <p className="text-xs text-slate-400 mt-0.5">Enter your current password and choose a new one</p>
-        </div>
+        <button 
+          onClick={() => setIsPasswordExpanded(!isPasswordExpanded)}
+          className="w-full text-left px-6 py-4 border-b border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/50 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors flex items-center justify-between"
+        >
+          <div>
+            <h2 className="text-base font-semibold text-slate-900 dark:text-white flex items-center gap-2">
+              <Lock className="w-4 h-4 text-blue-400" /> Change Password
+            </h2>
+            <p className="text-xs text-slate-400 mt-0.5">Enter your current password and choose a new one</p>
+          </div>
+          <div className="text-slate-400">
+            {isPasswordExpanded ? <ChevronUp className="w-5 h-5" /> : <ChevronDown className="w-5 h-5" />}
+          </div>
+        </button>
 
+        {isPasswordExpanded && (
         <div className="px-6 py-6">
           {error && (
             <div className="mb-4 p-3 bg-rose-500/10 border border-rose-500/30 rounded-lg flex items-start gap-2">
@@ -206,7 +221,7 @@ export default function SettingsPage() {
             {/* Requirements */}
             <div className="bg-slate-50 dark:bg-slate-900/50 p-4 rounded-lg border border-slate-200 dark:border-slate-700/50 grid grid-cols-2 gap-2 text-xs">
               {[
-                { label: '12+ characters', ok: hasMinLength },
+                { label: '8+ characters', ok: hasMinLength },
                 { label: 'Uppercase letter', ok: hasUpper },
                 { label: 'Lowercase letter', ok: hasLower },
                 { label: 'Number', ok: hasDigit },
@@ -229,6 +244,8 @@ export default function SettingsPage() {
             </button>
           </form>
         </div>
+        )}
+      </div>
       </div>
     </div>
   );

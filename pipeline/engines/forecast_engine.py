@@ -108,7 +108,7 @@ def _prophet_forecast(history: pd.DataFrame, sku: str, outlet: str) -> pd.DataFr
         holidays = _indian_holidays(years)
 
         model = Prophet(
-            yearly_seasonality=True,
+            yearly_seasonality=False,
             weekly_seasonality=True,
             daily_seasonality=False,
             holidays=holidays,

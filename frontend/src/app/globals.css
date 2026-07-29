@@ -85,3 +85,13 @@
     cursor: pointer;
   }
 }
+
+@keyframes fadeOutTimer {
+  0% { opacity: 1; }
+  85% { opacity: 1; }
+  100% { opacity: 0; }
+}
+
+.animate-fade-out-timer {
+  animation: fadeOutTimer 8s forwards;
+}

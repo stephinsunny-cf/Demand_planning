@@ -47,7 +47,11 @@ export default function LoginPage() {
       
       router.push('/dashboard')
     } catch (err: any) {
-      setErrorMsg(err.message || 'Failed to sign in')
+      let msg = err.message || 'Failed to sign in'
+      if (msg === 'Failed to fetch' || msg.toLowerCase().includes('invalid login credentials')) {
+        msg = 'Incorrect email or password.'
+      }
+      setErrorMsg(msg)
       setIsSubmitting(false)
     }
   }
@@ -119,9 +123,14 @@ export default function LoginPage() {
             </div>
             
             <div className="space-y-2 group">
-              <label htmlFor="password" className="text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400 group-focus-within:text-blue-600 dark:group-focus-within:text-blue-400 transition-colors">
-                Password
-              </label>
+              <div className="flex justify-between items-center">
+                <label htmlFor="password" className="text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400 group-focus-within:text-blue-600 dark:group-focus-within:text-blue-400 transition-colors">
+                  Password
+                </label>
+                <a href="/forgot-password" className="text-xs font-medium text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300">
+                  Forgot password?
+                </a>
+              </div>
               <div className="relative">
                 <input
                   id="password"

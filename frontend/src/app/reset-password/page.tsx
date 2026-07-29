@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { Lock, CheckCircle, AlertCircle, KeyRound, ShieldAlert } from 'lucide-react';
+import { Lock, CheckCircle, AlertCircle, KeyRound, ShieldAlert, Eye, EyeOff } from 'lucide-react';
 import api from '@/lib/api';
 import { supabase } from '@/lib/supabase';
 
@@ -14,9 +14,10 @@ export default function ResetPasswordPage() {
   const [error, setError] = useState('');
   const [success, setSuccess] = useState(false);
   const [sessionLoading, setSessionLoading] = useState(true);
+  const [showPassword, setShowPassword] = useState(false);
 
   // Password complexity rules
-  const hasMinLength = newPassword.length >= 12;
+  const hasMinLength = newPassword.length >= 8;
   const hasUpper = /[A-Z]/.test(newPassword);
   const hasLower = /[a-z]/.test(newPassword);
   const hasDigit = /[0-9]/.test(newPassword);
@@ -26,18 +27,34 @@ export default function ResetPasswordPage() {
   const isFormValid = hasMinLength && hasUpper && hasLower && hasDigit && hasSymbol && passwordsMatch;
 
   useEffect(() => {
-    // When the user clicks the invite link, Supabase will parse the URL hash and set the session.
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      if (session?.user) {
+    // Listen for the hash fragment parsing explicitly to catch both flow types:
+    // 1. SIGNED_IN: User arrives from an Invite Link (must_reset_password flow)
+    // 2. PASSWORD_RECOVERY: User arrives from a Forgot/Reset Password link
+    const { data: authListener } = supabase.auth.onAuthStateChange((event, session) => {
+      if ((event === 'SIGNED_IN' || event === 'PASSWORD_RECOVERY') && session?.user) {
         // Ensure our API interceptor has the token
         localStorage.setItem('sb-token', session.access_token);
         document.cookie = `sb-token=${session.access_token}; path=/; max-age=86400; SameSite=Lax`;
         setSessionLoading(false);
-      } else {
-        // Fallback or waiting for hash parse
-        setTimeout(() => setSessionLoading(false), 2000);
       }
     });
+
+    // Also check if session is already established just in case
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      if (session?.user) {
+        localStorage.setItem('sb-token', session.access_token);
+        document.cookie = `sb-token=${session.access_token}; path=/; max-age=86400; SameSite=Lax`;
+        setSessionLoading(false);
+      }
+    });
+
+    // Safety timeout in case no session exists (direct visit without hash)
+    const timer = setTimeout(() => setSessionLoading(false), 3000);
+
+    return () => {
+      authListener.subscription.unsubscribe();
+      clearTimeout(timer);
+    };
   }, []);
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -70,22 +87,22 @@ export default function ResetPasswordPage() {
 
   if (sessionLoading) {
     return (
-      <div className="min-h-screen bg-slate-900 flex items-center justify-center p-4">
-        <div className="text-slate-400">Verifying secure session...</div>
+      <div className="min-h-screen bg-slate-50 dark:bg-slate-950 flex items-center justify-center p-4">
+        <div className="text-slate-500 dark:text-slate-400">Verifying secure session...</div>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-slate-900 flex items-center justify-center p-4">
-      <div className="max-w-md w-full bg-slate-800 rounded-xl border border-slate-700 p-8 shadow-2xl">
+    <div className="min-h-screen bg-slate-50 dark:bg-slate-950 flex items-center justify-center p-4">
+      <div className="max-w-md w-full bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-800 p-8 shadow-2xl">
         <div className="flex items-center space-x-3 mb-6">
-          <div className="p-3 bg-amber-500/10 rounded-lg border border-amber-500/20">
-            <KeyRound className="w-6 h-6 text-amber-400" />
+          <div className="p-3 bg-amber-100 dark:bg-amber-500/10 rounded-lg border border-amber-200 dark:border-amber-500/20">
+            <KeyRound className="w-6 h-6 text-amber-600 dark:text-amber-400" />
           </div>
           <div>
-            <h1 className="text-xl font-bold text-white">Password Reset Required</h1>
-            <p className="text-sm text-slate-400">Set your permanent password to continue</p>
+            <h1 className="text-xl font-bold text-slate-900 dark:text-white">Password Reset Required</h1>
+            <p className="text-sm text-slate-500 dark:text-slate-400">Set your permanent password to continue</p>
           </div>
         </div>
 
@@ -105,60 +122,72 @@ export default function ResetPasswordPage() {
 
         <form onSubmit={handleSubmit} className="space-y-5">
           <div>
-            <label className="block text-sm font-medium text-slate-300 mb-1.5">New Password</label>
+            <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1.5">New Password</label>
             <div className="relative">
               <input
-                type="password"
+                type={showPassword ? 'text' : 'password'}
                 value={newPassword}
                 onChange={(e) => setNewPassword(e.target.value)}
                 required
                 placeholder="••••••••••••"
-                className="w-full bg-slate-900 border border-slate-700 rounded-lg px-4 py-2.5 text-white placeholder-slate-500 focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 text-sm"
+                className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-slate-800 rounded-lg px-4 py-2.5 text-slate-900 dark:text-white placeholder-slate-400 dark:placeholder-slate-500 focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 text-sm"
               />
-              <Lock className="w-4 h-4 text-slate-500 absolute right-3 top-3" />
+              <button
+                type="button"
+                onClick={() => setShowPassword(!showPassword)}
+                className="absolute right-3 top-3 text-slate-400 hover:text-slate-600 dark:hover:text-slate-300"
+              >
+                {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+              </button>
             </div>
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-slate-300 mb-1.5">Confirm New Password</label>
+            <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1.5">Confirm New Password</label>
             <div className="relative">
               <input
-                type="password"
+                type={showPassword ? 'text' : 'password'}
                 value={confirmPassword}
                 onChange={(e) => setConfirmPassword(e.target.value)}
                 required
                 placeholder="••••••••••••"
-                className="w-full bg-slate-900 border border-slate-700 rounded-lg px-4 py-2.5 text-white placeholder-slate-500 focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 text-sm"
+                className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-slate-800 rounded-lg px-4 py-2.5 text-slate-900 dark:text-white placeholder-slate-400 dark:placeholder-slate-500 focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 text-sm"
               />
-              <Lock className="w-4 h-4 text-slate-500 absolute right-3 top-3" />
+              <button
+                type="button"
+                onClick={() => setShowPassword(!showPassword)}
+                className="absolute right-3 top-3 text-slate-400 hover:text-slate-600 dark:hover:text-slate-300"
+              >
+                {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+              </button>
             </div>
           </div>
 
           {/* Password Complexity Checklist */}
-          <div className="bg-slate-900/50 p-4 rounded-lg border border-slate-700/50 space-y-2 text-xs">
-            <p className="font-semibold text-slate-400 mb-2">Password Requirements:</p>
+          <div className="bg-slate-100 dark:bg-slate-900/50 p-4 rounded-lg border border-slate-200 dark:border-slate-700/50 space-y-2 text-xs">
+            <p className="font-semibold text-slate-700 dark:text-slate-400 mb-2">Password Requirements:</p>
             <div className="grid grid-cols-2 gap-2">
-              <div className={`flex items-center space-x-1.5 ${hasMinLength ? 'text-emerald-400' : 'text-slate-500'}`}>
+              <div className={`flex items-center space-x-1.5 ${hasMinLength ? 'text-emerald-600 dark:text-emerald-400' : 'text-slate-400 dark:text-slate-500'}`}>
                 <CheckCircle className="w-3.5 h-3.5" />
-                <span>At least 12 characters</span>
+                <span>At least 8 characters</span>
               </div>
-              <div className={`flex items-center space-x-1.5 ${hasUpper ? 'text-emerald-400' : 'text-slate-500'}`}>
+              <div className={`flex items-center space-x-1.5 ${hasUpper ? 'text-emerald-600 dark:text-emerald-400' : 'text-slate-400 dark:text-slate-500'}`}>
                 <CheckCircle className="w-3.5 h-3.5" />
                 <span>Uppercase letter</span>
               </div>
-              <div className={`flex items-center space-x-1.5 ${hasLower ? 'text-emerald-400' : 'text-slate-500'}`}>
+              <div className={`flex items-center space-x-1.5 ${hasLower ? 'text-emerald-600 dark:text-emerald-400' : 'text-slate-400 dark:text-slate-500'}`}>
                 <CheckCircle className="w-3.5 h-3.5" />
                 <span>Lowercase letter</span>
               </div>
-              <div className={`flex items-center space-x-1.5 ${hasDigit ? 'text-emerald-400' : 'text-slate-500'}`}>
+              <div className={`flex items-center space-x-1.5 ${hasDigit ? 'text-emerald-600 dark:text-emerald-400' : 'text-slate-400 dark:text-slate-500'}`}>
                 <CheckCircle className="w-3.5 h-3.5" />
                 <span>Numeric digit</span>
               </div>
-              <div className={`flex items-center space-x-1.5 ${hasSymbol ? 'text-emerald-400' : 'text-slate-500'}`}>
+              <div className={`flex items-center space-x-1.5 ${hasSymbol ? 'text-emerald-600 dark:text-emerald-400' : 'text-slate-400 dark:text-slate-500'}`}>
                 <CheckCircle className="w-3.5 h-3.5" />
                 <span>Symbol (!@#$%^&*)</span>
               </div>
-              <div className={`flex items-center space-x-1.5 ${passwordsMatch ? 'text-emerald-400' : 'text-slate-500'}`}>
+              <div className={`flex items-center space-x-1.5 ${passwordsMatch ? 'text-emerald-600 dark:text-emerald-400' : 'text-slate-400 dark:text-slate-500'}`}>
                 <CheckCircle className="w-3.5 h-3.5" />
                 <span>Passwords match</span>
               </div>
@@ -168,7 +197,7 @@ export default function ResetPasswordPage() {
           <button
             type="submit"
             disabled={!isFormValid || loading}
-            className="w-full bg-indigo-600 hover:bg-indigo-500 disabled:bg-slate-700 disabled:text-slate-500 text-white font-medium py-2.5 rounded-lg transition-colors duration-150 text-sm shadow-lg"
+            className="w-full bg-[#011B4D] hover:bg-[#02266b] disabled:bg-slate-700 disabled:text-slate-300 text-white font-medium py-2.5 rounded-lg transition-colors duration-150 text-sm shadow-lg"
           >
             {loading ? 'Updating Password...' : 'Save New Password & Continue'}
           </button>

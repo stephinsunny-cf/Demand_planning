@@ -64,13 +64,6 @@ export default function Sidebar() {
           )
         })}
       </nav>
-
-      <div className="px-6 pb-6 mt-auto">
-        <div className="rounded-2xl bg-white/50 dark:bg-slate-900 p-4 text-xs text-slate-500 border border-white/60 dark:border-slate-800/50">
-          <p className="text-slate-500 dark:text-slate-400 font-medium mb-0.5">Demand Planning Engine</p>
-          <p>v1.0 · Beta</p>
-        </div>
-      </div>
     </aside>
   )
 }

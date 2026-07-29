@@ -196,6 +196,8 @@ def clean_kitchen_stock(df: pd.DataFrame) -> pd.DataFrame:
     if "qty_available" in df.columns:
         df["qty_available"] = pd.to_numeric(df["qty_available"], errors="coerce").fillna(0)
         df = df[df["qty_available"] >= 0]
+    if "snapshot_time" in df.columns and "snapshot_date" not in df.columns:
+        df["snapshot_date"] = pd.to_datetime(df["snapshot_time"]).dt.date
     return df.reset_index(drop=True)
 
 
@@ -238,6 +240,10 @@ def clean_vendor_master(df: pd.DataFrame) -> pd.DataFrame:
     if "price" in df.columns:
         df["price"] = pd.to_numeric(df["price"], errors="coerce").fillna(0.0)
     df = df.drop_duplicates(subset=["vendor_name", "ingredient"], keep="last")
+    
+    if "vendor_name" in df.columns and "vendor_id" not in df.columns:
+        df["vendor_id"] = "V-" + df["vendor_name"].str.replace(r"[^A-Za-z0-9]", "", regex=True).str.upper().str.slice(0, 10)
+        
     return df.reset_index(drop=True)
 
 

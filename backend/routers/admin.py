@@ -167,7 +167,51 @@ def resend_invite(
         return {"message": f"New invite link sent to {target_email}."}
 
     except Exception as exc:
-        raise HTTPException(status_code=500, detail=f"Failed to resend temporary password: {str(exc)}")
+        raise HTTPException(status_code=500, detail=f"Failed to resend invite: {str(exc)}")
+
+
+@router.post("/admin/users/{user_id}/reset-password")
+def force_password_reset(
+    user_id: str,
+    caller: UserContext = Depends(require_role("admin", "super_admin"))
+):
+    """Trigger a Supabase password recovery email for an active user and force a reset on next login."""
+    df = query_df("SELECT email, role FROM user_profiles WHERE user_id = %s", params=(user_id,))
+    if df.empty:
+        raise HTTPException(status_code=404, detail="User profile not found")
+
+    target_email = df["email"].iloc[0]
+    target_role  = df["role"].iloc[0]
+
+    if target_role in ("admin", "super_admin") and caller.role != "super_admin":
+        raise HTTPException(status_code=403, detail="Only Super Admins can manage Admin accounts.")
+
+    try:
+        try:
+            from supabase import create_client
+            sb_admin = create_client(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY)
+            
+            # Send recovery email
+            sb_admin.auth.reset_password_for_email(
+                target_email,
+                options={"redirect_to": f"{APP_URL}/reset-password"}
+            )
+            
+            # Immediately kill any existing active sessions globally
+            sb_admin.auth.admin.sign_out(user_id, scope="global")
+        except Exception as sb_err:
+            log.warning("Supabase reset_password/sign_out offline: %s", sb_err)
+
+        with get_db() as conn:
+            with conn.cursor() as cur:
+                cur.execute("UPDATE user_profiles SET must_reset_password = TRUE, updated_at = CURRENT_TIMESTAMP WHERE user_id = %s", (user_id,))
+                conn.commit()
+
+        clear_user_profile_cache(user_id)
+        return {"message": f"Password reset email sent to {target_email} and active sessions revoked."}
+
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=f"Failed to force password reset: {str(exc)}")
 
 
 @router.put("/admin/users/{user_id}/role")
@@ -204,13 +248,8 @@ def deactivate_user(
             cur.execute("UPDATE user_profiles SET is_active = FALSE, updated_at = CURRENT_TIMESTAMP WHERE user_id = %s", (user_id,))
             conn.commit()
 
-    # Revoke Supabase Auth user session immediately
-    try:
-        from supabase import create_client
-        sb_admin = create_client(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY)
-        sb_admin.auth.admin.delete_user(user_id)
-    except Exception as exc:
-        log.warning("Could not revoke Supabase session during deactivation: %s", exc)
+    # The backend auth middleware explicitly checks user_profiles.is_active on every request.
+    # We do not delete the user from Supabase so they can be reactivated later.
 
     clear_user_profile_cache(user_id)
     return {"message": f"User {user_id} deactivated and session revoked."}
@@ -231,6 +270,33 @@ def reactivate_user(
     return {"message": f"User {user_id} reactivated successfully."}
 
 
+@router.delete("/admin/users/{user_id}")
+def delete_user(
+    user_id: str,
+    caller: UserContext = Depends(require_role("super_admin"))
+):
+    """Completely delete a user from both Supabase and the local database (Super Admin only)."""
+    if user_id == caller.user_id:
+        raise HTTPException(status_code=400, detail="Super Admins cannot delete their own account.")
+
+    # 1. Delete from PostgreSQL
+    with get_db() as conn:
+        with conn.cursor() as cur:
+            cur.execute("DELETE FROM user_profiles WHERE user_id = %s", (user_id,))
+            conn.commit()
+
+    # 2. Delete from Supabase Auth
+    try:
+        from supabase import create_client
+        sb_admin = create_client(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY)
+        sb_admin.auth.admin.delete_user(user_id)
+    except Exception as exc:
+        log.warning("Could not delete user from Supabase during hard delete (maybe already deleted): %s", exc)
+
+    clear_user_profile_cache(user_id)
+    return {"message": f"User {user_id} permanently deleted."}
+
+
 @router.post("/auth/reset-password")
 def reset_password(
     req: ResetPasswordRequest,
@@ -238,8 +304,8 @@ def reset_password(
 ):
     """User self-service password reset. Validates complexity and clears must_reset_password flag."""
     pwd = req.new_password
-    if len(pwd) < 12:
-        raise HTTPException(status_code=400, detail="Password must be at least 12 characters long.")
+    if len(pwd) < 8:
+        raise HTTPException(status_code=400, detail="Password must be at least 8 characters long.")
 
     has_upper = any(c.isupper() for c in pwd)
     has_lower = any(c.islower() for c in pwd)
