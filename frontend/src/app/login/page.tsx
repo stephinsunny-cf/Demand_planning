@@ -38,7 +38,7 @@ export default function LoginPage() {
       try {
         const res = await api.get('/api/auth/profile')
         if (res.data?.must_reset_password) {
-          router.push('/settings')
+          router.push('/reset-password')
           return
         }
       } catch (profileErr) {

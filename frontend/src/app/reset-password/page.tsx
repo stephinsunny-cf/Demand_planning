@@ -1,8 +1,10 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { Lock, CheckCircle, AlertCircle, KeyRound, ShieldAlert } from 'lucide-react';
+import api from '@/lib/api';
+import { supabase } from '@/lib/supabase';
 
 export default function ResetPasswordPage() {
   const router = useRouter();
@@ -11,6 +13,7 @@ export default function ResetPasswordPage() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState(false);
+  const [sessionLoading, setSessionLoading] = useState(true);
 
   // Password complexity rules
   const hasMinLength = newPassword.length >= 12;
@@ -22,6 +25,21 @@ export default function ResetPasswordPage() {
 
   const isFormValid = hasMinLength && hasUpper && hasLower && hasDigit && hasSymbol && passwordsMatch;
 
+  useEffect(() => {
+    // When the user clicks the invite link, Supabase will parse the URL hash and set the session.
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      if (session?.user) {
+        // Ensure our API interceptor has the token
+        localStorage.setItem('sb-token', session.access_token);
+        document.cookie = `sb-token=${session.access_token}; path=/; max-age=86400; SameSite=Lax`;
+        setSessionLoading(false);
+      } else {
+        // Fallback or waiting for hash parse
+        setTimeout(() => setSessionLoading(false), 2000);
+      }
+    });
+  }, []);
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!isFormValid) return;
@@ -30,16 +48,14 @@ export default function ResetPasswordPage() {
     setError('');
 
     try {
-      const res = await fetch('http://localhost:8000/api/auth/reset-password', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ new_password: newPassword }),
-      });
-
-      const data = await res.json();
-      if (!res.ok) {
-        throw new Error(data.detail || 'Password reset failed.');
+      if (process.env.NEXT_PUBLIC_DEMO_MODE !== 'true') {
+        const { error: sbError } = await supabase.auth.updateUser({ password: newPassword });
+        if (sbError) throw sbError;
       }
+
+      // Hit the backend to clear the must_reset_password flag.
+      // (The backend endpoint also sets the password via admin API, but that's safe to run twice).
+      await api.post('/api/auth/reset-password', { new_password: newPassword });
 
       setSuccess(true);
       setTimeout(() => {
@@ -51,6 +67,14 @@ export default function ResetPasswordPage() {
       setLoading(false);
     }
   };
+
+  if (sessionLoading) {
+    return (
+      <div className="min-h-screen bg-slate-900 flex items-center justify-center p-4">
+        <div className="text-slate-400">Verifying secure session...</div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-slate-900 flex items-center justify-center p-4">

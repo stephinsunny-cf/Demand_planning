@@ -29,9 +29,14 @@ api.interceptors.response.use(
     if (error.response?.status === 401 && typeof window !== 'undefined') {
       localStorage.removeItem('sb-token')
       
-      // We must dynamically import supabase to avoid circular dependencies if any
-      const { supabase } = await import('./supabase')
-      await supabase.auth.signOut()
+      if (process.env.NEXT_PUBLIC_DEMO_MODE !== 'true') {
+        try {
+          const { supabase } = await import('./supabase')
+          await supabase.auth.signOut()
+        } catch (e) {
+          // ignore network errors on signout
+        }
+      }
       
       window.location.href = '/login'
     }

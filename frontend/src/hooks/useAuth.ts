@@ -14,6 +14,15 @@ export function useAuth() {
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
+    if (process.env.NEXT_PUBLIC_DEMO_MODE === 'true') {
+      const demoToken = localStorage.getItem('sb-token')
+      if (demoToken) {
+        setUser({ id: 'mock_user', email: 'admin@curefoods.in', role: 'super_admin' })
+      }
+      setLoading(false)
+      return
+    }
+
     supabase.auth.getSession().then(({ data: { session } }) => {
       if (session?.user) {
         let role = session.user.user_metadata?.role || 'viewer'
@@ -37,10 +46,6 @@ export function useAuth() {
         localStorage.setItem('sb-token', session.access_token)
         document.cookie = `sb-token=${session.access_token}; path=/; max-age=86400; SameSite=Lax`
         setUser({ id: session.user.id, email: session.user.email!, role })
-      } else {
-        setUser(null)
-        localStorage.removeItem('sb-token')
-        document.cookie = 'sb-token=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT'
       }
     })
 
@@ -48,15 +53,29 @@ export function useAuth() {
   }, [])
 
   const signInWithGoogle = useCallback(async () => {
+    if (process.env.NEXT_PUBLIC_DEMO_MODE === 'true') return
     await supabase.auth.signInWithOAuth({ provider: 'google' })
   }, [])
 
   const signInWithEmail = useCallback(async (email: string, password: string) => {
+    if (process.env.NEXT_PUBLIC_DEMO_MODE === 'true') {
+      const demoToken = 'mock-token'
+      localStorage.setItem('sb-token', demoToken)
+      document.cookie = `sb-token=${demoToken}; path=/; max-age=86400; SameSite=Lax`
+      setUser({ id: 'mock_user', email, role: 'super_admin' })
+      return
+    }
     const { error } = await supabase.auth.signInWithPassword({ email, password })
     if (error) throw error
   }, [])
 
   const signOut = useCallback(async () => {
+    if (process.env.NEXT_PUBLIC_DEMO_MODE === 'true') {
+      setUser(null)
+      localStorage.removeItem('sb-token')
+      document.cookie = 'sb-token=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT'
+      return
+    }
     await supabase.auth.signOut()
     setUser(null)
     localStorage.removeItem('sb-token')

@@ -115,8 +115,7 @@ export default function AdminPage() {
 
     try {
       const res = await api.post('/api/admin/users', { email: newEmail, role: newRole });
-      const defaultPwd = res.data?.temp_password || 'curefoods123';
-      setBannerSuccess(`✅ User ${newEmail} created! Share this default password with them: ${defaultPwd} — They must change it on first login.`);
+      setBannerSuccess(`✅ User ${newEmail} invited! An email has been sent with a magic link.`);
       setIsModalOpen(false);
       setNewEmail('');
       setNewRole('editor');
@@ -133,16 +132,16 @@ export default function AdminPage() {
     }
   };
 
-  const handleResendTempPassword = async (userId: string, email: string) => {
+  const handleResendInvite = async (userId: string, email: string) => {
     setConfirmDialog({
       isOpen: true,
-      title: 'Resend Password',
-      message: `Resend temporary password for ${email}? This will force a password reset on next login.`,
+      title: 'Resend Invite Link',
+      message: `Resend Supabase invite magic link to ${email}?`,
       onConfirm: async () => {
         setConfirmDialog(null);
         try {
-          await api.post(`/api/admin/users/${userId}/resend-temp-password`);
-          setBannerSuccess(`New temporary password generated and emailed to ${email}.`);
+          await api.post(`/api/admin/users/${userId}/resend-invite`);
+          setBannerSuccess(`New invite link emailed to ${email}.`);
           mutate(true);
         } catch (err: any) {
           setBannerError(err.response?.data?.detail || err.message || 'Failed to resend temporary password');
@@ -355,8 +354,8 @@ export default function AdminPage() {
                     </td>
                     <td className="px-6 py-4 text-right space-x-2">
                       <button
-                        onClick={() => handleResendTempPassword(u.user_id, u.email)}
-                        title="Resend Temporary Password"
+                        onClick={() => handleResendInvite(u.user_id, u.email)}
+                        title="Resend Invite Link"
                         className="p-1.5 bg-slate-700 hover:bg-slate-600 text-slate-300 rounded-lg transition-colors"
                       >
                         <KeyRound className="w-4 h-4" />
@@ -407,7 +406,7 @@ export default function AdminPage() {
               <UserPlus className="w-5 h-5 text-emerald-400" /> Add New User
             </h3>
             <p className="text-xs text-slate-400 mb-6">
-              A random, 12+ character temporary password will be generated and emailed to the user. They will be forced to set their own password on first login.
+              A secure magic link will be emailed to the user. They will be forced to set their own password when they click the link.
             </p>
 
             <form onSubmit={handleCreateUser} className="space-y-4">

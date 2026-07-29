@@ -17,8 +17,21 @@ export default function Layout({ title, children }: Props) {
   const router = useRouter()
 
   useEffect(() => {
-    if (!loading && !user) {
-      router.push('/login')
+    if (!loading) {
+      if (!user) {
+        router.push('/login')
+      } else {
+        // Enforce must_reset_password safety net across the entire app
+        import('@/lib/api').then(({ default: api }) => {
+          api.get('/api/auth/profile').then(res => {
+            if (res.data?.must_reset_password) {
+              router.push('/reset-password')
+            }
+          }).catch(err => {
+            console.warn('Could not fetch profile in Layout', err)
+          })
+        })
+      }
     }
   }, [user, loading, router])
 

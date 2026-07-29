@@ -6,12 +6,9 @@ Session Revocation, and Forced Password Reset Endpoints.
 """
 
 import os
-import string
-import secrets
 import logging
 from typing import Optional
 from pydantic import BaseModel
-import resend
 
 from fastapi import APIRouter, Depends, HTTPException, status, BackgroundTasks
 from backend.auth import get_current_user, require_role, UserContext, clear_user_profile_cache
@@ -25,94 +22,7 @@ SUPABASE_KEY = os.getenv("SUPABASE_KEY", "")
 SUPABASE_SERVICE_ROLE_KEY = os.getenv("SUPABASE_SERVICE_ROLE_KEY", "") or SUPABASE_KEY
 
 
-def generate_secure_temp_password(length: int = 14) -> str:
-    """
-    Generate a cryptographically random temporary password guaranteed to satisfy all complexity rules:
-    at least 1 uppercase, 1 lowercase, 1 digit, and 1 special symbol.
-    """
-    uppercase = string.ascii_uppercase
-    lowercase = string.ascii_lowercase
-    digits    = string.digits
-    symbols   = "!@#$%^&*"
-    all_chars = uppercase + lowercase + digits + symbols
-
-    # Guarantee at least one from each class
-    pwd = [
-        secrets.choice(uppercase),
-        secrets.choice(lowercase),
-        secrets.choice(digits),
-        secrets.choice(symbols),
-    ]
-    # Fill remainder
-    pwd += [secrets.choice(all_chars) for _ in range(length - 4)]
-    secrets.SystemRandom().shuffle(pwd)
-    return "".join(pwd)
-
-
-# Email config from environment
-RESEND_API_KEY = os.getenv("RESEND_API_KEY", "")
-APP_NAME           = os.getenv("APP_NAME", "Curefoods Demand Planning")
-APP_URL            = os.getenv("APP_URL", "http://localhost:3000")
-EMAIL_FROM         = os.getenv("EMAIL_FROM", "onboarding@resend.dev")
-DEFAULT_TEMP_PASSWORD = os.getenv("DEFAULT_TEMP_PASSWORD", "curefoods123")
-
-
-def send_temp_password_email(email: str, temp_password: str) -> bool:
-    """
-    Send a temporary password email via Resend API.
-    Falls back to console log if RESEND_API_KEY is not configured.
-    Returns True if email sent, False if fallback used.
-    """
-    if not RESEND_API_KEY:
-        log.warning(f"[EMAIL FALLBACK] Resend not configured. Temp password for {email}: {temp_password}")
-        return False
-
-    try:
-        resend.api_key = RESEND_API_KEY
-
-        html_body = f"""
-<html><body style="font-family: Arial, sans-serif; background:#f4f4f4; padding:30px;">
-  <div style="max-width:520px; margin:auto; background:#fff; border-radius:10px;
-              padding:32px; border:1px solid #e0e0e0; box-shadow:0 2px 8px rgba(0,0,0,0.05);">
-    <h2 style="color:#011B4D; margin-bottom:6px;">Welcome to {APP_NAME}</h2>
-    <p style="color:#666; font-size:14px;">Your account has been created by a system administrator.</p>
-    <hr style="border:none; border-top:1px solid #eee; margin:20px 0;">
-    <p style="font-size:14px; color:#444;">Your temporary password is:</p>
-    <div style="background:#f0f4ff; border:1px solid #c7d7ff; border-radius:6px;
-                padding:14px 20px; font-size:22px; font-weight:bold;
-                letter-spacing:2px; color:#011B4D; text-align:center; margin:12px 0;">
-      {temp_password}
-    </div>
-    <p style="font-size:13px; color:#888; margin-top:6px;">
-      ⚠️ You will be asked to set a new, permanent password immediately on first login.
-    </p>
-    <a href="{APP_URL}" style="display:inline-block; margin-top:20px; padding:12px 28px;
-       background:#011B4D; color:#fff; border-radius:6px; text-decoration:none;
-       font-weight:bold; font-size:14px;">Log In Now →</a>
-    <hr style="border:none; border-top:1px solid #eee; margin:28px 0 16px;">
-    <p style="font-size:12px; color:#aaa;">If you did not expect this email, contact your administrator.</p>
-  </div>
-</body></html>
-"""
-
-        params: resend.Emails.SendParams = {
-            "from": f"{APP_NAME} <{EMAIL_FROM}>",
-            "to": [email],
-            "subject": f"Your {APP_NAME} Account — Temporary Password",
-            "html": html_body,
-        }
-
-        response = resend.Emails.send(params)
-        log.info(f"[EMAIL] Temporary password sent to {email} via Resend. ID: {response.get('id')}")
-        return True
-
-    except Exception as e:
-        log.error(f"[EMAIL] Resend error sending to {email}: {e}")
-        # Don't raise — log and continue so user creation still succeeds
-        return False
-
-
-
+APP_URL = os.getenv("APP_URL", "http://localhost:3000")
 class CreateUserRequest(BaseModel):
     email: str
     role: str  # reader, editor, admin, super_admin
@@ -141,7 +51,7 @@ def create_user(
     caller: UserContext = Depends(require_role("admin", "super_admin"))
 ):
     """
-    Create a new user with a cryptographically random temporary password.
+    Invite a new user via Supabase Magic Link.
     Enforces privilege boundaries: Only super_admin can create admin or super_admin users.
     """
     requested_role = req.role.lower()
@@ -155,8 +65,6 @@ def create_user(
             detail="Only Super Admins can assign Admin or Super Admin roles to new users."
         )
 
-    # Use fixed default password — admin shares this manually with the new user
-    temp_password = DEFAULT_TEMP_PASSWORD
     created_auth_user_id = None
 
     try:
@@ -164,13 +72,14 @@ def create_user(
             from supabase import create_client
             sb_admin = create_client(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY)
             
-            # 1. Create in Supabase Auth
-            auth_resp = sb_admin.auth.admin.create_user({
-                "email": req.email,
-                "password": temp_password,
-                "email_confirm": True,
-                "user_metadata": {"role": requested_role}
-            })
+            # 1. Invite via Supabase Auth
+            auth_resp = sb_admin.auth.admin.invite_user_by_email(
+                req.email,
+                options={
+                    "data": {"role": requested_role},
+                    "redirect_to": f"{APP_URL}/reset-password"
+                }
+            )
             
             if auth_resp and auth_resp.user:
                 created_auth_user_id = auth_resp.user.id
@@ -192,15 +101,13 @@ def create_user(
                 """, (created_auth_user_id, req.email, requested_role))
                 conn.commit()
 
-        # 3. Try sending email in background (optional, won't block if it fails)
-        background_tasks.add_task(send_temp_password_email, req.email, temp_password)
+        # 3. Clear cache and return success
         clear_user_profile_cache(created_auth_user_id)
 
         return {
-            "message": f"User {req.email} created successfully.",
+            "message": f"User {req.email} invited successfully. An email has been sent.",
             "user_id": created_auth_user_id,
             "role": requested_role,
-            "temp_password": temp_password,
             "must_reset_password": True
         }
 
@@ -221,13 +128,12 @@ def create_user(
         raise HTTPException(status_code=500, detail=f"Failed to create user: {str(exc)}")
 
 
-@router.post("/admin/users/{user_id}/resend-temp-password")
-def resend_temp_password(
+@router.post("/admin/users/{user_id}/resend-invite")
+def resend_invite(
     user_id: str,
-    background_tasks: BackgroundTasks,
     caller: UserContext = Depends(require_role("admin", "super_admin"))
 ):
-    """Regenerate new temporary password and force must_reset_password = True."""
+    """Resend the Supabase invite magic link to the user."""
     df = query_df("SELECT email, role FROM user_profiles WHERE user_id = %s", params=(user_id,))
     if df.empty:
         raise HTTPException(status_code=404, detail="User profile not found")
@@ -236,27 +142,29 @@ def resend_temp_password(
     target_role  = df["role"].iloc[0]
 
     if target_role in ("admin", "super_admin") and caller.role != "super_admin":
-        raise HTTPException(status_code=403, detail="Only Super Admins can manage Admin passwords.")
-
-    new_temp_password = generate_secure_temp_password()
+        raise HTTPException(status_code=403, detail="Only Super Admins can manage Admin accounts.")
 
     try:
         try:
             from supabase import create_client
             sb_admin = create_client(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY)
-            sb_admin.auth.admin.update_user_by_id(user_id, {"password": new_temp_password})
+            sb_admin.auth.admin.invite_user_by_email(
+                target_email,
+                options={
+                    "data": {"role": target_role},
+                    "redirect_to": f"{APP_URL}/reset-password"
+                }
+            )
         except Exception as sb_err:
-            log.warning("Supabase update_user_by_id offline: %s", sb_err)
+            log.warning("Supabase invite_user_by_email offline: %s", sb_err)
 
         with get_db() as conn:
             with conn.cursor() as cur:
                 cur.execute("UPDATE user_profiles SET must_reset_password = TRUE, updated_at = CURRENT_TIMESTAMP WHERE user_id = %s", (user_id,))
                 conn.commit()
 
-        background_tasks.add_task(send_temp_password_email, target_email, new_temp_password)
         clear_user_profile_cache(user_id)
-
-        return {"message": f"New temporary password generated and sent to {target_email}."}
+        return {"message": f"New invite link sent to {target_email}."}
 
     except Exception as exc:
         raise HTTPException(status_code=500, detail=f"Failed to resend temporary password: {str(exc)}")
