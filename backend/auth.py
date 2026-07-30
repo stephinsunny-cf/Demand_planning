@@ -80,10 +80,11 @@ def _fetch_user_profile_from_db(user_id: str, email: str) -> dict:
         log.warning("Could not fetch user profile from DB: %s", exc)
 
     # Fallback default if profile record not found yet
+    # Fails closed (viewer) to prevent privilege escalation
     default_profile = {
         "user_id": user_id,
         "email": email,
-        "role": "super_admin" if email and "curefoods" in email.lower() else "viewer",
+        "role": "viewer",
         "must_reset_password": False,
         "is_active": True,
     }
@@ -95,30 +96,8 @@ async def get_current_user(
     credentials: Optional[HTTPAuthorizationCredentials] = Depends(security),
 ) -> UserContext:
     """Verify Supabase JWT and return validated UserContext with active status and role."""
-    
-    # Enable bypass for DEMO_MODE or local automated tests if token is 'mock-token'
-    if credentials and credentials.credentials == "mock-token":
-        profile = _fetch_user_profile_from_db("mock_user", "admin@curefoods.in")
-        if not profile["is_active"]:
-            raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="User account is deactivated")
-        return UserContext(
-            user_id=profile["user_id"],
-            email=profile["email"],
-            role=profile["role"],
-            must_reset_password=profile["must_reset_password"],
-            is_active=profile["is_active"],
-        )
-
     if not credentials:
-        # Development fallback: if no token provided, treat as admin fallback
-        profile = _fetch_user_profile_from_db("mock_user", "admin@curefoods.in")
-        return UserContext(
-            user_id=profile["user_id"],
-            email=profile["email"],
-            role=profile["role"],
-            must_reset_password=profile["must_reset_password"],
-            is_active=profile["is_active"],
-        )
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Missing or invalid authentication token")
 
     token = credentials.credentials
 
@@ -164,17 +143,6 @@ def require_role(*roles: str):
             # Admin can do everything except strict super_admin routes
             if roles != ("super_admin",):
                 return user
-                
-        if user.role == "editor":
-            # Editor can do business tasks, but cannot access admin/super_admin routes
-            if "admin" not in roles and "super_admin" not in roles:
-                return user
-                
-        if user.role == "reader":
-            # Reader can only access GET endpoints for business tasks
-            if request.method == "GET":
-                if "admin" not in roles and "super_admin" not in roles:
-                    return user
 
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,

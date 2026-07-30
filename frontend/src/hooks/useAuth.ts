@@ -38,6 +38,9 @@ export function useAuth() {
     })
 
     const { data: listener } = supabase.auth.onAuthStateChange((_event, session) => {
+      // Do not hijack the password recovery flow
+      if (_event === 'PASSWORD_RECOVERY') return;
+
       if (session?.user) {
         let role = session.user.user_metadata?.role || 'viewer'
         if (process.env.NEXT_PUBLIC_ADMIN_EMAIL && session.user.email?.toLowerCase() === process.env.NEXT_PUBLIC_ADMIN_EMAIL.toLowerCase()) {

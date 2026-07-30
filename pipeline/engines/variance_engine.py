@@ -54,11 +54,14 @@ def run_variance_engine():
 
         # 3. Calculate Expected and Actual Usage directly in SQL to prevent Pandas MemoryErrors
         # Delete the rolling window dates to replace them cleanly
-        conn.execute(text(f"DELETE FROM fact_variance WHERE date >= '{start_date}' AND date <= '{end_date}'"))
+        conn.execute(
+            text("DELETE FROM fact_variance WHERE date >= :start_date AND date <= :end_date"),
+            {"start_date": start_date, "end_date": end_date}
+        )
         
         logger.info("Computing variance and upserting directly inside PostgreSQL...")
         
-        upsert_sql = f"""
+        upsert_sql = """
             WITH expected AS (
                 SELECT 
                     CAST(o.created_at_ist AS DATE) as date,
@@ -71,8 +74,8 @@ def run_variance_engine():
                 JOIN item_alias_mapping am ON am.pos_name = i.item_name
                     AND (am.pos_option = i.option_names OR am.pos_option IS NULL)
                 JOIN recipe_master rm ON rm.dish_name = am.recipe_name
-                WHERE CAST(o.created_at_ist AS DATE) >= '{start_date}'
-                  AND CAST(o.created_at_ist AS DATE) <= '{end_date}'
+                WHERE CAST(o.created_at_ist AS DATE) >= :start_date
+                  AND CAST(o.created_at_ist AS DATE) <= :end_date
                 GROUP BY CAST(o.created_at_ist AS DATE), lower(trim(o.store_name)), lower(trim(rm.ingredient))
             ),
             actual AS (
@@ -82,7 +85,7 @@ def run_variance_engine():
                     lower(trim(sku)) as ingredient,
                     SUM(qty_sold) as actual_qty
                 FROM fact_daily_sales
-                WHERE date >= '{start_date}' AND date <= '{end_date}'
+                WHERE date >= :start_date AND date <= :end_date
                 GROUP BY date, lower(trim(outlet)), lower(trim(sku))
             )
             INSERT INTO fact_variance (date, outlet, ingredient, expected_qty, actual_qty, variance_qty, variance_pct, unit)
@@ -106,7 +109,7 @@ def run_variance_engine():
                 AND e.ingredient = a.ingredient
             WHERE COALESCE(e.expected_qty, 0) > 0 OR COALESCE(a.actual_qty, 0) > 0
         """
-        conn.execute(text(upsert_sql))
+        conn.execute(text(upsert_sql), {"start_date": start_date, "end_date": end_date})
         conn.commit()
             
     logger.info("Variance Engine completed successfully.")

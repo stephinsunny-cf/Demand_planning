@@ -132,6 +132,7 @@ def run_full_pipeline(skip_extract: bool = False):
         from psycopg2.extras import execute_values
         with get_db() as conn:
             with conn.cursor() as cur:
+                cur.execute("DROP TABLE IF EXISTS fact_ingredient_demand_new")
                 # Use LIKE to clone schema and indexes
                 cur.execute('CREATE TABLE IF NOT EXISTS fact_ingredient_demand_new (LIKE fact_ingredient_demand INCLUDING ALL)')
                 

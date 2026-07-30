@@ -258,6 +258,7 @@ def run() -> pd.DataFrame:
         # Write to Postgres
         with get_db() as conn:
             with conn.cursor() as cur:
+                cur.execute("DROP TABLE IF EXISTS fact_forecast_new")
                 # Use LIKE to clone schema and indexes
                 cur.execute("CREATE TABLE IF NOT EXISTS fact_forecast_new (LIKE fact_forecast INCLUDING ALL)")
                 

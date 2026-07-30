@@ -183,6 +183,7 @@ def run() -> pd.DataFrame:
                     )
                 """)
                 
+                cur.execute("DROP TABLE IF EXISTS fact_procurement_new")
                 # Use LIKE to clone schema and indexes
                 cur.execute("CREATE TABLE IF NOT EXISTS fact_procurement_new (LIKE fact_procurement INCLUDING ALL)")
                 
