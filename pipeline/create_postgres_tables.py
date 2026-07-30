@@ -100,6 +100,19 @@ DDL_STATEMENTS = [
         error_message   TEXT
     )
     """,
+    # ── Pipeline Output Tables ──────────────────────────────────────────────
+    """
+    CREATE TABLE IF NOT EXISTS fact_forecast (
+        forecast_date       DATE,
+        sku                 VARCHAR(100),
+        outlet              VARCHAR(100),
+        qty_predicted       REAL,
+        qty_lower           REAL,
+        qty_upper           REAL,
+        model_run_date      DATE,
+        in_sample_accuracy  FLOAT
+    )
+    """,
     # ── Performance Indexes ────────────────────────────────────────────────
     "CREATE INDEX IF NOT EXISTS idx_pos_orders_created_at ON pos_orders (created_at_ist);",
     "CREATE INDEX IF NOT EXISTS idx_pos_orders_brand ON pos_orders (brand_name);",

@@ -289,12 +289,13 @@ def run() -> pd.DataFrame:
                 cur.execute("CREATE TABLE IF NOT EXISTS fact_forecast_new (LIKE fact_forecast INCLUDING ALL)")
                 
                 insert_query = """
-                    INSERT INTO fact_forecast_new (forecast_date, sku, outlet, qty_predicted, qty_lower, qty_upper, model_run_date)
+                    INSERT INTO fact_forecast_new (forecast_date, sku, outlet, qty_predicted, qty_lower, qty_upper, model_run_date, in_sample_accuracy)
                     VALUES %s
                 """
                 values = [
-                    (row['forecast_date'], row['sku'], row['outlet'], 
-                     float(row['qty_predicted']), float(row['qty_lower']), float(row['qty_upper']), row['model_run_date'])
+                    (row['forecast_date'], row['sku'], row['outlet'],
+                     float(row['qty_predicted']), float(row['qty_lower']), float(row['qty_upper']),
+                     row['model_run_date'], row.get('in_sample_accuracy', None))
                     for _, row in result.iterrows()
                 ]
                 execute_values(cur, insert_query, values)
