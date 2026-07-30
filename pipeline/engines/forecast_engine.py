@@ -185,6 +185,21 @@ def run() -> pd.DataFrame:
     print("ENGINE 2: Forecast Engine (Prophet) - start")
 
     try:
+        # ── Weekly Schedule Logic ──
+        # Only run the heavy Prophet ML model on Sundays (weekday() == 6).
+        # On Monday-Saturday, instantly load the cached curve from Postgres.
+        if datetime.today().weekday() != 6:
+            print("Today is not Sunday. Skipping heavy ML forecast and loading from cache...")
+            cached_forecast = query_df("SELECT forecast_date, sku, outlet, qty_predicted, qty_lower, qty_upper, model_run_date FROM fact_forecast")
+            if not cached_forecast.empty:
+                # Ensure date format consistency with Pandas ML output
+                cached_forecast["forecast_date"] = pd.to_datetime(cached_forecast["forecast_date"]).dt.date
+                cached_forecast["model_run_date"] = pd.to_datetime(cached_forecast["model_run_date"]).dt.date
+                print(f"Loaded {len(cached_forecast)} cached forecast rows.")
+                return cached_forecast
+            else:
+                print("Forecast cache is empty. Falling back to full ML generation...")
+
         # Find the maximum date in the dataset to simulate "today"
         max_date_df = query_df("""
             SELECT MAX(date) as max_date 

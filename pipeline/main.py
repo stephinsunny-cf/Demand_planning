@@ -182,7 +182,6 @@ def run_full_pipeline(skip_extract: bool = False):
     log.info("--------------------------------------------------------")
     log.info("Sales rows:          %d", 0) # Obsolete UrbanPiper engine removed
     log.info("Forecast rows:       %d", len(forecasts) if forecasts is not None else 0)
-    log.info("Supply plan rows:    %d", len(supply_plan) if supply_plan is not None else 0)
     log.info("Ingredient demands:  %d", len(ingredient_demand_agg) if ingredient_demand is not None else 0)
     log.info("Shortage items:      %d", len(warehouse_shortage) if warehouse_shortage is not None else 0)
     log.info("Procurement recs:    %d", len(procurement_recs) if procurement_recs is not None else 0)
@@ -190,7 +189,6 @@ def run_full_pipeline(skip_extract: bool = False):
 
     return {
         "forecasts":          forecasts,
-        "supply_plan":        supply_plan,
         "ingredient_demand":  ingredient_demand,
         "warehouse_shortage": warehouse_shortage,
         "procurement_recs":   procurement_recs,
