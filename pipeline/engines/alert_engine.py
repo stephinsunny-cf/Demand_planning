@@ -13,7 +13,7 @@ import sys
 import os
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
-from backend.database import query_df, get_db_connection
+from backend.database import query_df, get_db
 
 import pandas as pd
 
@@ -41,7 +41,7 @@ def run() -> list:
     print("ENGINE 7: Alert Engine - start")
 
     # 1. Create table if not exists
-    with get_db_connection() as conn:
+    with get_db() as conn:
         with conn.cursor() as cur:
             cur.execute("""
                 CREATE TABLE IF NOT EXISTS alerts (
@@ -216,7 +216,7 @@ def run() -> list:
 
         # Insert new alerts
         if new_alerts:
-            with get_db_connection() as conn:
+            with get_db() as conn:
                 with conn.cursor() as cur:
                     insert_query = """
                         INSERT INTO alerts (

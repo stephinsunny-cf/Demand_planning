@@ -127,23 +127,16 @@ def run_full_pipeline(skip_extract: bool = False):
         ingredient_demand["outlet"] = "ALL"
         
         # Save to database so Procurement and Alert engines can use it
-        from backend.database import get_db_connection
+        from backend.database import get_db
         import psycopg2
         from psycopg2.extras import execute_values
-        with get_db_connection() as conn:
+        with get_db() as conn:
             with conn.cursor() as cur:
-                cur.execute('''
-                    CREATE TABLE IF NOT EXISTS fact_ingredient_demand (
-                        forecast_date DATE,
-                        outlet VARCHAR(255),
-                        ingredient VARCHAR(255),
-                        unit VARCHAR(50),
-                        total_qty_needed FLOAT
-                    )
-                ''')
-                cur.execute("TRUNCATE TABLE fact_ingredient_demand")
+                # Use LIKE to clone schema and indexes
+                cur.execute('CREATE TABLE IF NOT EXISTS fact_ingredient_demand_new (LIKE fact_ingredient_demand INCLUDING ALL)')
+                
                 insert_query = '''
-                    INSERT INTO fact_ingredient_demand (forecast_date, outlet, ingredient, unit, total_qty_needed)
+                    INSERT INTO fact_ingredient_demand_new (forecast_date, outlet, ingredient, unit, total_qty_needed)
                     VALUES %s
                 '''
                 values = [
@@ -151,6 +144,10 @@ def run_full_pipeline(skip_extract: bool = False):
                     for _, row in ingredient_demand.iterrows()
                 ]
                 execute_values(cur, insert_query, values)
+                
+                # Atomic table swap
+                cur.execute("DROP TABLE IF EXISTS fact_ingredient_demand")
+                cur.execute("ALTER TABLE fact_ingredient_demand_new RENAME TO fact_ingredient_demand")
                 conn.commit()
                 log.info(f"Saved {len(values)} rows to fact_ingredient_demand")
                 

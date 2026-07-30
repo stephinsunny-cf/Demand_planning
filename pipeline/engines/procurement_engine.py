@@ -19,7 +19,7 @@ import sys
 import os
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
-from backend.database import query_df, get_db_connection
+from backend.database import query_df, get_db
 
 log = logging.getLogger(__name__)
 IST = timezone(timedelta(hours=5, minutes=30))
@@ -159,8 +159,9 @@ def run() -> pd.DataFrame:
         print(f"Generated {len(recs)} procurement recommendations.")
 
         # Write to Postgres
-        with get_db_connection() as conn:
+        with get_db() as conn:
             with conn.cursor() as cur:
+                # Ensure the original table exists first so LIKE works
                 cur.execute("""
                     CREATE TABLE IF NOT EXISTS fact_procurement (
                         ingredient VARCHAR(255),
@@ -181,10 +182,12 @@ def run() -> pd.DataFrame:
                         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
                     )
                 """)
-                cur.execute("TRUNCATE TABLE fact_procurement")
+                
+                # Use LIKE to clone schema and indexes
+                cur.execute("CREATE TABLE IF NOT EXISTS fact_procurement_new (LIKE fact_procurement INCLUDING ALL)")
                 
                 insert_query = """
-                    INSERT INTO fact_procurement (
+                    INSERT INTO fact_procurement_new (
                         ingredient, unit, total_demand, warehouse_stock, net_requirement,
                         safety_buffer, po_qty, vendor_name, lead_time_days, moq, price,
                         recommended_qty, estimated_cost, expected_delivery, urgency
@@ -197,6 +200,10 @@ def run() -> pd.DataFrame:
                     for _, r in recs.iterrows()
                 ]
                 execute_values(cur, insert_query, values)
+                
+                # Atomic table swap
+                cur.execute("DROP TABLE IF EXISTS fact_procurement")
+                cur.execute("ALTER TABLE fact_procurement_new RENAME TO fact_procurement")
                 conn.commit()
                 print("Successfully updated fact_procurement table!")
 

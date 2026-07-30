@@ -27,7 +27,7 @@ import numpy as np
 import sys
 import os
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
-from backend.database import query_df, get_db_connection
+from backend.database import query_df, get_db
 
 log = logging.getLogger(__name__)
 IST = timezone(timedelta(hours=5, minutes=30))
@@ -256,13 +256,13 @@ def run() -> pd.DataFrame:
         print(f"Generated {len(result)} forecast rows for {len(all_forecasts)} combos ({skipped} skipped)")
 
         # Write to Postgres
-        with get_db_connection() as conn:
+        with get_db() as conn:
             with conn.cursor() as cur:
-                # Clear existing forecast to avoid duplicates
-                cur.execute("TRUNCATE TABLE fact_forecast")
+                # Use LIKE to clone schema and indexes
+                cur.execute("CREATE TABLE IF NOT EXISTS fact_forecast_new (LIKE fact_forecast INCLUDING ALL)")
                 
                 insert_query = """
-                    INSERT INTO fact_forecast (forecast_date, sku, outlet, qty_predicted, qty_lower, qty_upper, model_run_date)
+                    INSERT INTO fact_forecast_new (forecast_date, sku, outlet, qty_predicted, qty_lower, qty_upper, model_run_date)
                     VALUES %s
                 """
                 values = [
@@ -271,6 +271,10 @@ def run() -> pd.DataFrame:
                     for _, row in result.iterrows()
                 ]
                 execute_values(cur, insert_query, values)
+                
+                # Atomic table swap
+                cur.execute("DROP TABLE IF EXISTS fact_forecast")
+                cur.execute("ALTER TABLE fact_forecast_new RENAME TO fact_forecast")
                 conn.commit()
                 print(f"Successfully inserted {len(values)} rows to fact_forecast!")
 
