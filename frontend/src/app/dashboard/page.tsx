@@ -112,14 +112,24 @@ export default function DashboardPage() {
               icon={<AlertTriangle size={18} />}
               color="rose"
             />
-            <KPICard
-              title="Forecast Accuracy"
-              value={`${data?.forecast_accuracy_percent?.toFixed(1) ?? '—'}%`}
-              subtitle="This week's MAPE score"
-              icon={<Target size={18} />}
-              color="violet"
-              trend={2}
-            />
+            {data?.forecast_accuracy_percent === null ? (
+              <KPICard
+                title="Forecast Accuracy"
+                value="No Data"
+                subtitle="Not enough historical data yet"
+                icon={<Target size={18} />}
+                color="slate"
+              />
+            ) : (
+              <KPICard
+                title="Forecast Accuracy"
+                value={`${data?.forecast_accuracy_percent?.toFixed(1) ?? '—'}%`}
+                subtitle="This week's MAPE score"
+                icon={<Target size={18} />}
+                color="violet"
+                trend={2}
+              />
+            )}
           </div>
 
           {/* Operational Pulse Row */}

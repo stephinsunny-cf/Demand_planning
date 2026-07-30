@@ -56,16 +56,22 @@ export default function ReportsPage() {
           <div className="card p-6 rounded-2xl">
             <h3 className="text-sm font-semibold text-slate-900 dark:text-white mb-1">Forecast Accuracy</h3>
             <p className="text-xs text-slate-500 mb-4">Target: 80% · Dashed line = target</p>
-            <ResponsiveContainer width="100%" height={240}>
-              <LineChart data={accuracy}>
-                <CartesianGrid strokeDasharray="3 3" stroke="#1e293b" />
-                <XAxis dataKey="week" tick={{ fill: '#64748b', fontSize: 10 }} tickFormatter={v => String(v).slice(5)} />
-                <YAxis domain={[50, 100]} tick={{ fill: '#64748b', fontSize: 11 }} unit="%" />
-                <Tooltip contentStyle={{ background: '#0f172a', border: '1px solid #1e293b', borderRadius: '8px' }} />
-                <ReferenceLine y={80} stroke="#34d399" strokeDasharray="4 4" label={{ value: '80% target', fill: '#34d399', fontSize: 10 }} />
-                <Line type="monotone" dataKey="accuracy" stroke="#818cf8" strokeWidth={2} dot={{ r: 3, fill: '#818cf8' }} name="Accuracy %" />
-              </LineChart>
-            </ResponsiveContainer>
+            {accuracy.length === 0 ? (
+              <div className="w-full height-240 flex items-center justify-center bg-slate-50 dark:bg-slate-800/50 rounded-xl border border-dashed border-slate-200 dark:border-slate-700" style={{ height: 240 }}>
+                <p className="text-sm text-slate-400 dark:text-slate-500">Not enough historical data yet</p>
+              </div>
+            ) : (
+              <ResponsiveContainer width="100%" height={240}>
+                <LineChart data={accuracy}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="#1e293b" />
+                  <XAxis dataKey="week" tick={{ fill: '#64748b', fontSize: 10 }} tickFormatter={v => String(v).slice(5)} />
+                  <YAxis domain={[50, 100]} tick={{ fill: '#64748b', fontSize: 11 }} unit="%" />
+                  <Tooltip contentStyle={{ background: '#0f172a', border: '1px solid #1e293b', borderRadius: '8px' }} />
+                  <ReferenceLine y={80} stroke="#34d399" strokeDasharray="4 4" label={{ value: '80% target', fill: '#34d399', fontSize: 10 }} />
+                  <Line type="monotone" dataKey="accuracy" stroke="#818cf8" strokeWidth={2} dot={{ r: 3, fill: '#818cf8' }} name="Accuracy %" />
+                </LineChart>
+              </ResponsiveContainer>
+            )}
           </div>
 
           {/* Chart 2: Stockout Incidents */}

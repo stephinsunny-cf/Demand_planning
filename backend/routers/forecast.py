@@ -56,8 +56,17 @@ def get_forecast(
 
     # MAPE calculation (last 7 days only)
     accuracy = None
-    if not hist_df.empty:
-        accuracy = 78.5  # placeholder — real MAPE computed in forecast engine
+    if not hist_df.empty and not fore_df.empty:
+        import pandas as pd
+        # hist_df columns: forecast_date (actually date from db), qty_predicted (actually qty_sold from db)
+        # fore_df columns: forecast_date, qty_predicted, etc.
+        # Wait, hist_df uses 'sum(qty_sold) AS qty_predicted', so we need to rename it for the merge
+        hist_for_merge = hist_df.rename(columns={"qty_predicted": "qty_sold"})
+        merged = pd.merge(hist_for_merge, fore_df, on="forecast_date", how="inner")
+        mask = merged["qty_sold"] > 0
+        if mask.sum() > 0:
+            mape = (abs(merged.loc[mask, "qty_predicted"] - merged.loc[mask, "qty_sold"]) / merged.loc[mask, "qty_sold"]).mean() * 100
+            accuracy = max(0.0, 100.0 - mape)
 
     return {
         "sku":            sku,

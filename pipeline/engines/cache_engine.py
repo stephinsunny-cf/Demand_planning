@@ -86,13 +86,7 @@ def generate_dashboard_summary():
         SELECT SUM(abs_err) as total_error, SUM(qty_sold) as total_sales FROM acc_data
     """
     acc_df = query_df(acc_sql)
-    if acc_df.empty or pd.isna(acc_df["total_sales"].iloc[0]) or acc_df["total_sales"].iloc[0] == 0:
-        accuracy = 88.5 
-    else:
-        err = acc_df["total_error"].iloc[0]
-        sales = acc_df["total_sales"].iloc[0]
-        wmape = float(err) / float(sales)
-        accuracy = max(0.0, 100.0 * (1 - wmape))
+    accuracy = _calculate_accuracy(acc_df)
 
     # Last data refresh
     refresh_df = query_df("SELECT max(completed_at) AS last FROM pipeline_runs WHERE status = 'SUCCESS'")
@@ -174,26 +168,37 @@ def generate_dashboard_summary():
         "vendor_performance":        vendor_performance,
     }
 
+def _calculate_accuracy(acc_df: pd.DataFrame) -> float | None:
+    """Helper to compute WMAPE accuracy from a DataFrame with total_error and total_sales."""
+    if acc_df.empty or pd.isna(acc_df["total_sales"].iloc[0]) or acc_df["total_sales"].iloc[0] == 0:
+        return None
+    err = acc_df["total_error"].iloc[0]
+    sales = acc_df["total_sales"].iloc[0]
+    wmape = float(err) / float(sales)
+    return max(0.0, 100.0 * (1 - wmape))
+
 def generate_accuracy_report():
-    import datetime
-    start = date.today() - datetime.timedelta(days=90)
-    df = query_df(f"""
+    df = query_df("""
         SELECT
-            date_trunc('week', started_at) AS week,
-            count(*) AS runs,
-            count(*) FILTER (WHERE status = 'SUCCESS') AS success_runs
-        FROM pipeline_runs
-        WHERE job_name = 'forecast_engine' AND started_at >= '{start}'
-        GROUP BY week ORDER BY week
+            date_trunc('week', f.forecast_date)::date AS week,
+            SUM(ABS(f.qty_predicted - s.qty_sold)) AS total_error,
+            SUM(s.qty_sold) AS total_sales
+        FROM fact_forecast f
+        JOIN fact_daily_sales s
+            ON f.sku = s.sku AND f.outlet = s.outlet AND f.forecast_date = s.date
+        WHERE f.forecast_date >= CURRENT_DATE - INTERVAL '90 days'
+        GROUP BY week
+        ORDER BY week
     """)
     if df.empty:
-        return [
-            {"week": str(date.today() - datetime.timedelta(weeks=i)), "accuracy": 78 + i * 0.5}
-            for i in range(12, 0, -1)
-        ]
-    df['week'] = df['week'].astype(str)
-    return df.to_dict(orient="records")
+        return []
 
+    df["accuracy"] = df.apply(
+        lambda r: max(0.0, 100.0 * (1 - (r["total_error"] / r["total_sales"]))) if r["total_sales"] else None,
+        axis=1
+    )
+    df["week"] = df["week"].astype(str)
+    return df[["week", "accuracy"]].to_dict(orient="records")
 def generate_stockout_report():
     import datetime
     start = date.today() - datetime.timedelta(days=90)

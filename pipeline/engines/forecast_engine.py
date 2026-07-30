@@ -141,7 +141,12 @@ def _prophet_forecast(history: pd.DataFrame, sku: str, outlet: str) -> pd.DataFr
         })
         result["forecast_date"] = result["forecast_date"].dt.date
 
-        return result[["forecast_date", "sku", "outlet", "qty_predicted", "qty_lower", "qty_upper", "model_run_date"]]
+        # Calculate in-sample fit quality (MAPE) for historical evaluation
+        in_sample_mape = _mape(history["qty_sold"].values, result["qty_predicted"][:len(history)].values)
+        in_sample_acc = max(0.0, 100.0 - in_sample_mape) if not math.isnan(in_sample_mape) else None
+        result["in_sample_accuracy"] = in_sample_acc
+
+        return result[["forecast_date", "sku", "outlet", "qty_predicted", "qty_lower", "qty_upper", "model_run_date", "in_sample_accuracy"]]
 
     except Exception as exc:
         return _moving_average_forecast(history, sku, outlet)
@@ -167,6 +172,7 @@ def _moving_average_forecast(history: pd.DataFrame, sku: str, outlet: str) -> pd
                 "qty_lower":     round(avg * 0.8, 2),
                 "qty_upper":     round(avg * 1.2, 2),
                 "model_run_date": today,
+                "in_sample_accuracy": None,
             })
         return pd.DataFrame(rows)
     except Exception as exc:
@@ -190,7 +196,7 @@ def run() -> pd.DataFrame:
         # On Monday-Saturday, instantly load the cached curve from Postgres.
         if datetime.now(IST).weekday() != 6:
             print("Today is not Sunday. Skipping heavy ML forecast and loading from cache...")
-            cached_forecast = query_df("SELECT forecast_date, sku, outlet, qty_predicted, qty_lower, qty_upper, model_run_date FROM fact_forecast")
+            cached_forecast = query_df("SELECT forecast_date, sku, outlet, qty_predicted, qty_lower, qty_upper, model_run_date, in_sample_accuracy FROM fact_forecast")
             if not cached_forecast.empty:
                 # Ensure date format consistency with Pandas ML output
                 cached_forecast["forecast_date"] = pd.to_datetime(cached_forecast["forecast_date"]).dt.date
