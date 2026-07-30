@@ -141,9 +141,14 @@ def _prophet_forecast(history: pd.DataFrame, sku: str, outlet: str) -> pd.DataFr
         })
         result["forecast_date"] = result["forecast_date"].dt.date
 
-        # Calculate in-sample fit quality (MAPE) for historical evaluation
-        in_sample_mape = _mape(history["qty_sold"].values, result["qty_predicted"][:len(history)].values)
+        # Calculate true in-sample fit quality (MAPE) for historical evaluation
+        # We need to compare Prophet's fitted values for past dates against actual sales
+        in_sample = forecast[forecast["ds"] < today][["ds", "yhat"]]
+        merged = df_prophet.merge(in_sample, on="ds", how="inner")
+        
+        in_sample_mape = _mape(merged["y"].values, merged["yhat"].values) if not merged.empty else float("nan")
         in_sample_acc = max(0.0, 100.0 - in_sample_mape) if not math.isnan(in_sample_mape) else None
+        
         result["in_sample_accuracy"] = in_sample_acc
 
         return result[["forecast_date", "sku", "outlet", "qty_predicted", "qty_lower", "qty_upper", "model_run_date", "in_sample_accuracy"]]
