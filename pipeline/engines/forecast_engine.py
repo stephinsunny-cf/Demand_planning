@@ -285,7 +285,7 @@ def run() -> pd.DataFrame:
                 except concurrent.futures.TimeoutError:
                     print(f"Worker timeout on combo {arg[1]} x {arg[2]}! Falling back to moving average...")
                     timeout_fallbacks += 1
-                    fallback_forecast = _moving_average_forecast(arg[0], arg[1], arg[2], None)
+                    fallback_forecast = _moving_average_forecast(arg[0], arg[1], arg[2])
                     if not fallback_forecast.empty:
                         all_forecasts.append(fallback_forecast)
                     else:
