@@ -115,7 +115,8 @@ DDL_STATEMENTS = [
         qty_predicted   Float32,
         qty_lower       Float32,
         qty_upper       Float32,
-        model_run_date  Date
+        model_run_date  Date,
+        in_sample_accuracy Float32
     ) ENGINE = MergeTree()
     ORDER BY (forecast_date, sku, outlet)
     """,
