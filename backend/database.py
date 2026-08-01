@@ -43,26 +43,60 @@ def _get_pool() -> pool.ThreadedConnectionPool:
         log.info("DB connection pool created (%s:%s/%s)", PG_HOST, PG_PORT, PG_DB)
     return _pool
 
+def close_all_connections():
+    """Explicitly tear down the global connection pool."""
+    global _pool
+    if _pool and not _pool.closed:
+        try:
+            _pool.closeall()
+        except Exception as e:
+            log.warning("Error closing connection pool: %s", e)
+        _pool = None
+
 @contextmanager
 def get_db():
     """Yield a connection from the pool; return it when done."""
+    global _pool
     conn = None
     p = _get_pool()
     try:
         conn = p.getconn()
+        
+        # Liveness check: verify connection hasn't been killed by the host (e.g. Render idle timeout)
+        try:
+            with conn.cursor() as cur:
+                cur.execute("SELECT 1")
+            conn.rollback() # end the implicit transaction from the ping
+        except Exception:
+            log.warning("Pooled connection dead. Rebuilding entire pool...")
+            try:
+                p.putconn(conn, close=True) # Explicitly discard, don't recycle
+            except Exception:
+                pass
+            close_all_connections()         # Whole pool likely stale together — rebuild it
+            p = _get_pool()
+            conn = p.getconn()
+
         conn.autocommit = False
         yield conn
     except Exception:
-        if conn:
-            conn.rollback()
-        raise
-    finally:
-        if conn:
+        if conn and p and not p.closed:
             try:
-                conn.reset()
+                conn.rollback()
             except Exception:
                 pass
-            p.putconn(conn)
+        raise
+    finally:
+        if conn and p and not p.closed:
+            try:
+                conn.reset()
+                p.putconn(conn)
+            except Exception:
+                # If reset fails, the connection is dirty/broken. Discard it.
+                try:
+                    p.putconn(conn, close=True)
+                except Exception:
+                    pass
 
 def get_db_connection():
     """Legacy helper — returns a pooled connection (caller must close/return it)."""

@@ -27,7 +27,7 @@ import numpy as np
 import sys
 import os
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
-from backend.database import query_df, get_db
+from backend.database import query_df, get_db, close_all_connections
 
 log = logging.getLogger(__name__)
 IST = timezone(timedelta(hours=5, minutes=30))
@@ -259,6 +259,10 @@ def run() -> pd.DataFrame:
 
         all_forecasts = []
         skipped = 0
+
+        # Close the connection pool explicitly before we start a 3-hour grind.
+        # This prevents the pool from holding idle connections that time out on the server side.
+        close_all_connections()
 
         with concurrent.futures.ProcessPoolExecutor(max_workers=max_workers) as executor:
             futures = [executor.submit(_prophet_forecast, arg[0], arg[1], arg[2]) for arg in args_list]
