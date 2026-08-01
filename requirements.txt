@@ -40,3 +40,4 @@ tenacity>=8.3.0
 
 # Email delivery
 resend>=2.0.0
+pebble>=5.0.0

@@ -33,6 +33,7 @@ log = logging.getLogger(__name__)
 IST = timezone(timedelta(hours=5, minutes=30))
 
 import concurrent.futures
+from pebble import ProcessPool
 import os
 
 MIN_HISTORY_DAYS = 30
@@ -259,23 +260,38 @@ def run() -> pd.DataFrame:
 
         all_forecasts = []
         skipped = 0
+        timeout_fallbacks = 0
 
         # Close the connection pool explicitly before we start a 3-hour grind.
         # This prevents the pool from holding idle connections that time out on the server side.
         close_all_connections()
 
-        with concurrent.futures.ProcessPoolExecutor(max_workers=max_workers) as executor:
-            futures = [executor.submit(_prophet_forecast, arg[0], arg[1], arg[2]) for arg in args_list]
+        with ProcessPool(max_workers=max_workers) as pool:
+            # We schedule tasks and map futures to their original args to handle fallbacks correctly
+            future_to_args = {}
+            for arg in args_list:
+                # 15 seconds is ~5x the 99th percentile fit time (which is ~2.5-3.0s)
+                future = pool.schedule(_prophet_forecast, args=(arg[0], arg[1], arg[2]), timeout=15)
+                future_to_args[future] = arg
             
-            for future in concurrent.futures.as_completed(futures):
+            for future in concurrent.futures.as_completed(future_to_args.keys()):
+                arg = future_to_args[future]
                 try:
                     forecast = future.result()
                     if forecast.empty:
                         skipped += 1
                     else:
                         all_forecasts.append(forecast)
+                except concurrent.futures.TimeoutError:
+                    print(f"Worker timeout on combo {arg[1]} x {arg[2]}! Falling back to moving average...")
+                    timeout_fallbacks += 1
+                    fallback_forecast = _moving_average_forecast(arg[0], arg[1], arg[2], None)
+                    if not fallback_forecast.empty:
+                        all_forecasts.append(fallback_forecast)
+                    else:
+                        skipped += 1
                 except Exception as exc:
-                    print(f"Worker failed: {exc}")
+                    print(f"Worker failed on combo {arg[1]} x {arg[2]}: {exc}")
                     skipped += 1
 
         if not all_forecasts:
@@ -283,7 +299,9 @@ def run() -> pd.DataFrame:
             return pd.DataFrame()
 
         result = pd.concat(all_forecasts, ignore_index=True)
-        print(f"Generated {len(result)} forecast rows for {len(all_forecasts)} combos ({skipped} skipped)")
+        print(f"Generated {len(result)} forecast rows for {len(all_forecasts)} combos.")
+        print(f"  - Skipped: {skipped}")
+        print(f"  - Timeout Fallbacks (Moving Avg): {timeout_fallbacks}")
 
         # Write to Postgres
         with get_db() as conn:
