@@ -7,7 +7,6 @@ numpy>=1.26.0
 
 # Database
 psycopg2-binary>=2.9.9
-clickhouse-connect>=0.7.0
 
 # HTTP / API
 requests>=2.31.0
