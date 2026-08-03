@@ -155,14 +155,15 @@ def fetch_from_metabase(table_name: str, date_col: str, start_dt: str, end_dt: s
 
 
 # ── Deduplication ──────────────────────────────────────────────────────────
-def clean_and_dedup(df: pd.DataFrame, dedup_key: list) -> pd.DataFrame:
-    """
+def clean_and_dedup(df: pd.DataFrame, dedup_key: list, date_col: str = None) -> pd.DataFrame:
+    \"\"\"
     1. Normalise column names.
     2. Remove sign=-1 tombstone rows (UrbanPiper ReplacingMergeTree deletes).
     3. Drop fully duplicate rows.
     4. Drop key-level duplicates (keep last = most recent version).
-    5. Replace NaN with None for PostgreSQL.
-    """
+    5. Standardize date format to prevent string sort issues.
+    6. Replace NaN with None for PostgreSQL.
+    \"\"\"
     df.columns = (
         df.columns.str.strip()
         .str.lower()
@@ -192,7 +193,11 @@ def clean_and_dedup(df: pd.DataFrame, dedup_key: list) -> pd.DataFrame:
         if before - len(df):
             log.info("  Removed %d key-level duplicates (kept latest)", before - len(df))
 
-    # Step 5 – NaN → None
+    # Step 5 - Enforce ISO date string format
+    if date_col and date_col in df.columns:
+        df[date_col] = pd.to_datetime(df[date_col], errors='coerce').dt.strftime('%Y-%m-%d %H:%M:%S')
+
+    # Step 6 – NaN → None
     df = df.where(pd.notnull(df), None)
     return df
 
@@ -303,24 +308,36 @@ def run():
         log.info("  New data detected! Downloading...")
 
         if pg_dt:
-            start_dt = (pg_dt - timedelta(days=1)).strftime("%Y-%m-%d %H:%M:%S")
+            curr_start = pg_dt - timedelta(days=1)
         else:
-            start_dt = (today - timedelta(days=1)).strftime("%Y-%m-%d %H:%M:%S")
+            curr_start = today - timedelta(days=1)
 
-        # ── Fetch ─────────────────────────────────────────────────────────
-        df = fetch_from_metabase(tbl["source"], tbl["date_col"], start_dt, end_dt)
-        if df is None or df.empty:
-            log.warning("  No rows returned — skipping.")
-            continue
+        end_limit = dt_parser.parse(end_dt)
+        if end_limit.tzinfo is None and curr_start.tzinfo is not None:
+            end_limit = end_limit.replace(tzinfo=curr_start.tzinfo)
+        elif end_limit.tzinfo is not None and curr_start.tzinfo is None:
+            curr_start = curr_start.replace(tzinfo=end_limit.tzinfo)
 
-        # ── Clean & Dedup ──────────────────────────────────────────────────
-        df = clean_and_dedup(df, tbl["dedup_key"])
-        log.info("  Clean rows after dedup: %d", len(df))
+        while curr_start < end_limit:
+            curr_end = min(curr_start + timedelta(days=15), end_limit)
+            start_dt_str = curr_start.strftime("%Y-%m-%d %H:%M:%S")
+            end_dt_str = curr_end.strftime("%Y-%m-%d %H:%M:%S")
 
-        # ── Insert ─────────────────────────────────────────────────────────
-        inserted = ensure_table_and_upsert(conn, df, tbl["dest"], tbl["dedup_key"])
-        log.info("  Rows inserted into %s: %d", tbl["dest"], inserted)
-        total_rows += inserted
+            # ── Fetch ─────────────────────────────────────────────────────────
+            df = fetch_from_metabase(tbl["source"], tbl["date_col"], start_dt_str, end_dt_str)
+            if df is None or df.empty:
+                log.warning("  No rows returned for chunk %s -> %s.", start_dt_str, end_dt_str)
+            else:
+                # ── Clean & Dedup ──────────────────────────────────────────────────
+                df = clean_and_dedup(df, tbl["dedup_key"], tbl["date_col"])
+                log.info("  Clean rows after dedup: %d", len(df))
+
+                # ── Insert ─────────────────────────────────────────────────────────
+                inserted = ensure_table_and_upsert(conn, df, tbl["dest"], tbl["dedup_key"])
+                log.info("  Rows inserted into %s: %d", tbl["dest"], inserted)
+                total_rows += inserted
+            
+            curr_start = curr_end
 
     conn.close()
     log.info("\n" + "=" * 65)
