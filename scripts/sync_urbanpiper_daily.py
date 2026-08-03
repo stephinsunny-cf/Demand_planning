@@ -156,14 +156,14 @@ def fetch_from_metabase(table_name: str, date_col: str, start_dt: str, end_dt: s
 
 # ── Deduplication ──────────────────────────────────────────────────────────
 def clean_and_dedup(df: pd.DataFrame, dedup_key: list, date_col: str = None) -> pd.DataFrame:
-    \"\"\"
+    """
     1. Normalise column names.
     2. Remove sign=-1 tombstone rows (UrbanPiper ReplacingMergeTree deletes).
     3. Drop fully duplicate rows.
     4. Drop key-level duplicates (keep last = most recent version).
     5. Standardize date format to prevent string sort issues.
     6. Replace NaN with None for PostgreSQL.
-    \"\"\"
+    """
     df.columns = (
         df.columns.str.strip()
         .str.lower()
