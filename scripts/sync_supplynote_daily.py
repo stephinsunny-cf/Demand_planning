@@ -405,7 +405,7 @@ def run():
             page.goto("https://www.supplynote.in/signin", wait_until="domcontentloaded", timeout=60000)
             page.fill('input[name="username"], input[name="email"], input[placeholder*="username" i], input[placeholder*="email" i]', SN_USERNAME)
             page.fill('input[type="password"]', SN_PASSWORD)
-            page.click('button[type="submit"]')
+            page.click('button:has-text("Log in")')
             try:
                 page.wait_for_url(lambda url: "/signin" not in url and "/login" not in url, timeout=25000)
                 log.info("Logged in successfully!")

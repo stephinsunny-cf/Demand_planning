@@ -56,7 +56,7 @@ def run(yesterday_only=False):
             log.info("Logging in...")
             page.fill('input[name="username"], input[name="email"], input[placeholder*="username" i], input[placeholder*="email" i]', SN_USERNAME)
             page.fill('input[type="password"]', SN_PASSWORD)
-            page.click('button[type="submit"]')
+            page.click('button:has-text("Log in")')
             
             try:
                 page.wait_for_url(lambda url: "/signin" not in url and "/login" not in url, timeout=20000)
