@@ -174,7 +174,7 @@ export default function AdminPage() {
 
   const submitRoleChange = async () => {
     if (!changeRoleDialog) return;
-    const { userId, selectedRole } = changeRoleDialog;
+    const { userId, selectedRole, email } = changeRoleDialog;
     setChangeRoleDialog(null);
     try {
       await api.put(`/api/admin/users/${userId}/role`, { role: selectedRole });

@@ -297,6 +297,18 @@ def delete_user(
     return {"message": f"User {user_id} permanently deleted."}
 
 
+@router.get("/auth/profile")
+def get_user_profile(user: UserContext = Depends(get_current_user)):
+    """Return the current user's profile and password reset status."""
+    return {
+        "user_id": user.user_id,
+        "email": user.email,
+        "role": user.role,
+        "must_reset_password": user.must_reset_password,
+        "is_active": user.is_active
+    }
+
+
 @router.post("/auth/reset-password")
 def reset_password(
     req: ResetPasswordRequest,
