@@ -13,7 +13,7 @@ import { IndianRupee, ShoppingBag, Layers, Activity, AlertTriangle } from 'lucid
 export default function SalesPage() {
   const [tab, setTab] = useState<'consumption' | 'pos'>('consumption')
   const [startDate, setStartDate] = useState(() => {
-    const d = new Date(); d.setDate(d.getDate() - 30); return d.toISOString().slice(0, 10)
+    const d = new Date(); d.setDate(d.getDate() - 7); return d.toISOString().slice(0, 10)
   })
   const [endDate, setEndDate] = useState(new Date().toISOString().slice(0, 10))
   const [brand, setBrand] = useState('')

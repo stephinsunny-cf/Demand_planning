@@ -155,10 +155,10 @@ def get_sales(
         if not max_date_df.empty and max_date_df["max_date"].iloc[0] is not None:
             latest = pd.to_datetime(max_date_df["max_date"].iloc[0]).date()
             if not end_date: end_date = str(latest)
-            if not start_date: start_date = str(latest - timedelta(days=30))
+            if not start_date: start_date = str(latest - timedelta(days=7))
         else:
             if not end_date: end_date = str(date.today())
-            if not start_date: start_date = str(date.today() - timedelta(days=30))
+            if not start_date: start_date = str(date.today() - timedelta(days=7))
 
     where = ["date >= %s", "date <= %s"]
     params = [start_date, end_date]
@@ -176,15 +176,17 @@ def get_sales(
         where.append("lower(sku) LIKE lower(%s)")
         params.append(f"%{sku}%")
 
+    # Aggregate by sku+outlet+brand+city (not per-date) to keep result set small
+    # and avoid the expensive 6M-group fan-out on 111M rows
     sql = f"""
-        SELECT date, sku, brand, outlet, city,
-               sum(qty_sold) AS qty_sold,
-               sum(revenue) AS revenue,
+        SELECT sku, brand, outlet, city,
+               sum(qty_sold)    AS qty_sold,
+               sum(revenue)     AS revenue,
                sum(order_count) AS order_count
         FROM fact_daily_sales
         WHERE {' AND '.join(where)}
-        GROUP BY date, sku, brand, outlet, city
-        ORDER BY date DESC
+        GROUP BY sku, brand, outlet, city
+        ORDER BY qty_sold DESC NULLS LAST
         LIMIT 5000
     """
     df = query_df(sql, tuple(params))
@@ -203,10 +205,10 @@ async def get_sales_summary(
         if not max_date_df.empty and max_date_df["max_date"].iloc[0] is not None:
             latest = pd.to_datetime(max_date_df["max_date"].iloc[0]).date()
             if not end_date: end_date = str(latest)
-            if not start_date: start_date = str(latest - timedelta(days=30))
+            if not start_date: start_date = str(latest - timedelta(days=7))
         else:
             if not end_date: end_date = str(date.today())
-            if not start_date: start_date = str(date.today() - timedelta(days=30))
+            if not start_date: start_date = str(date.today() - timedelta(days=7))
 
     sql_params = (start_date, end_date)
 
