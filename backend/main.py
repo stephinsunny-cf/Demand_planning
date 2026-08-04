@@ -81,12 +81,12 @@ app.include_router(variance.router,    prefix="/api", tags=["Variance"])
 # ── Health check ──────────────────────────────────────────────────────────────
 @app.get("/health", tags=["System"])
 async def health():
-    from backend.database import get_client
+    from backend.database import get_db
     db_ok = False
     try:
-        client = get_client()
-        client.query("SELECT 1")
-        client.close()
+        with get_db() as conn:
+            with conn.cursor() as cur:
+                cur.execute("SELECT 1")
         db_ok = True
     except Exception:
         pass
