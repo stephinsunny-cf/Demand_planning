@@ -215,6 +215,7 @@ async def get_sales_summary(
     task_totals = asyncio.to_thread(query_df, """
         SELECT sum(revenue) AS total_revenue,
                sum(order_count) AS total_orders,
+               sum(qty_sold) AS total_qty,
                count(DISTINCT sku) AS unique_skus
         FROM fact_daily_sales
         WHERE date >= %s AND date <= %s
@@ -238,11 +239,13 @@ async def get_sales_summary(
 
     total_rev = float(totals["total_revenue"].iloc[0]) if not totals.empty and pd.notna(totals["total_revenue"].iloc[0]) else 0
     total_ord = int(totals["total_orders"].iloc[0]) if not totals.empty and pd.notna(totals["total_orders"].iloc[0]) else 0
+    total_qty = float(totals["total_qty"].iloc[0]) if not totals.empty and pd.notna(totals["total_qty"].iloc[0]) else 0
     unique_skus = int(totals["unique_skus"].iloc[0]) if not totals.empty and pd.notna(totals["unique_skus"].iloc[0]) else 0
 
     return safe_json_response({
         "total_revenue":    round(total_rev, 2),
         "total_orders":     total_ord,
+        "total_qty":        total_qty,
         "avg_order_value":  round(total_rev / total_ord, 2) if total_ord > 0 else 0,
         "unique_skus":      unique_skus,
         "top_skus":         top_skus.to_dict(orient="records") if not top_skus.empty else [],

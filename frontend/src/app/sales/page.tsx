@@ -54,9 +54,7 @@ export default function SalesPage() {
     { key: 'outlet', label: 'Kitchen Outlet', sortable: true },
     { key: 'brand', label: 'Brand', sortable: true },
     { key: 'sku', label: 'Raw Ingredient', sortable: true },
-    { key: 'order_count', label: 'Usage Frequency', sortable: true },
     { key: 'qty_sold', label: 'Qty Consumed', sortable: true, render: (v: unknown) => Number(v).toFixed(2) },
-    { key: 'revenue', label: 'Cost Value (₹)', sortable: true, render: (v: unknown) => `₹${Number(v).toLocaleString('en-IN')}` },
   ]
 
   return (
@@ -128,9 +126,7 @@ export default function SalesPage() {
             </div>
           ) : (
             <div className="grid grid-cols-2 xl:grid-cols-4 gap-4">
-              <KPICard title="Ingredient Cost Value" value={`₹${Number(summary.total_revenue || 0).toLocaleString('en-IN')}`} icon={<IndianRupee size={18} />} color="rose" />
-              <KPICard title="Total Consumption Events" value={Number(summary.total_orders || 0).toLocaleString()} icon={<Activity size={18} />} color="orange" />
-              <KPICard title="Avg Ingredient Cost" value={`₹${Number(summary.avg_order_value || 0).toLocaleString('en-IN')}`} icon={<IndianRupee size={18} />} color="violet" />
+              <KPICard title="Total Qty Consumed" value={Number(summary.total_qty || 0).toLocaleString('en-IN')} icon={<Activity size={18} />} color="emerald" />
               <KPICard title="Unique Ingredients Used" value={summary.unique_skus as number || 0} icon={<Layers size={18} />} color="amber" />
             </div>
           )}
