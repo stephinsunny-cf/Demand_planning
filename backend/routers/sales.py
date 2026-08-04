@@ -57,8 +57,8 @@ def get_sales_pos(
 
     sql = f"""
         SELECT CAST(o.created_at_ist AS DATE) as date, i.item_name as sku, o.brand_name as brand, o.store_name as outlet, o.city,
-               sum(i.quantity) AS qty_sold,
-               sum(i.total_price) AS revenue,
+               sum(CAST(NULLIF(REPLACE(i.quantity, ',', ''), '') AS numeric)) AS qty_sold,
+               sum(CAST(NULLIF(REPLACE(i.total_price, ',', ''), '') AS numeric)) AS revenue,
                count(DISTINCT o.id) AS order_count
         FROM pos_order_items i
         JOIN pos_orders o ON i.order_id = o.id
@@ -93,7 +93,7 @@ async def get_sales_pos_summary(
     sql_params = (start_date, end_date_plus_1)
 
     task_totals = asyncio.to_thread(query_df, """
-        SELECT sum(total_amount) AS total_revenue, count(id) AS total_orders
+        SELECT sum(CAST(NULLIF(REPLACE(total_amount, ',', ''), '') AS numeric)) AS total_revenue, count(id) AS total_orders
         FROM pos_orders
         WHERE created_at_ist >= %s AND created_at_ist < %s
     """, sql_params)
@@ -106,7 +106,9 @@ async def get_sales_pos_summary(
     """, sql_params)
 
     task_top = asyncio.to_thread(query_df, """
-        SELECT i.item_name as sku, sum(i.quantity) AS total_qty, sum(i.total_price) AS total_revenue
+        SELECT i.item_name as sku,
+               sum(CAST(NULLIF(REPLACE(i.quantity, ',', ''), '') AS numeric)) AS total_qty,
+               sum(CAST(NULLIF(REPLACE(i.total_price, ',', ''), '') AS numeric)) AS total_revenue
         FROM pos_order_items i
         JOIN pos_orders o ON i.order_id = o.id
         WHERE o.created_at_ist >= %s AND o.created_at_ist < %s
@@ -114,7 +116,7 @@ async def get_sales_pos_summary(
     """, sql_params)
 
     task_brand = asyncio.to_thread(query_df, """
-        SELECT brand_name as brand, sum(total_amount) AS revenue, count(id) AS orders
+        SELECT brand_name as brand, sum(CAST(NULLIF(REPLACE(total_amount, ',', ''), '') AS numeric)) AS revenue, count(id) AS orders
         FROM pos_orders
         WHERE created_at_ist >= %s AND created_at_ist < %s
         GROUP BY brand_name ORDER BY revenue DESC
