@@ -110,7 +110,7 @@ def run_full_pipeline(skip_extract: bool = False):
     log.info("\n── STEP 4-10: RUN PLANNING ENGINES ──────────────────────")
 
     log.info("\n[Engine 2] Forecast Engine (Prophet)")
-    forecasts = forecast_engine.run()
+    forecasts = forecast_engine.run()  # NOTE: internally runs Prophet only on Sundays; returns cached fact_forecast on other days
     log_pipeline_run("forecast_engine", started_at, "SUCCESS", len(forecasts) if forecasts is not None else 0)
 
     log.info("\n[Engine 4] Variance Engine")
