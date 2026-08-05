@@ -69,7 +69,7 @@ jobs:
         run: |
           python scripts/sync_urbanpiper_daily.py
 
-      - name: Run Overnight ML Calculations (Forecast & Procurement)
+      - name: Run Daily ML Calculations (Forecast, Warehouse, Procurement, Alerts, Cache)
         env:
           PG_HOST:             ${{ secrets.PG_HOST }}
           PG_USER:             ${{ secrets.PG_USER }}
@@ -77,12 +77,9 @@ jobs:
           PG_DB:               ${{ secrets.PG_DB }}
           PG_PORT:             ${{ secrets.PG_PORT }}
         run: |
-          # Runs on Sundays only (day-of-week check via Python). Skips gracefully on other days.
-          python -c "
-import datetime, sys, subprocess
-if datetime.datetime.utcnow().weekday() != 6:
-    print('Skipping ML calculations — today is not Sunday.')
-    sys.exit(0)
-result = subprocess.run([sys.executable, 'pipeline/main.py', '--process-only'])
-sys.exit(result.returncode)
-"
+          # Runs every day. Previously gated to Sundays only over a ~21h
+          # runtime scare that turned out to be a local machine sleeping
+          # mid-run, not real compute time — clean CI runs finish in a few
+          # minutes. If combo volume grows enough to matter, re-add a
+          # day-of-week gate here and in pipeline/engines/forecast_engine.py.
+          python pipeline/main.py --process-only

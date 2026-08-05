@@ -197,20 +197,16 @@ def run() -> pd.DataFrame:
     print("ENGINE 2: Forecast Engine (Prophet) - start")
 
     try:
-        # ── Weekly Schedule Logic ──
-        # Only run the heavy Prophet ML model on Sundays (weekday() == 6).
-        # On Monday-Saturday, instantly load the cached curve from Postgres.
-        if datetime.now(IST).weekday() != 6:
-            print("Today is not Sunday. Skipping heavy ML forecast and loading from cache...")
-            cached_forecast = query_df("SELECT forecast_date, sku, outlet, qty_predicted, qty_lower, qty_upper, model_run_date, in_sample_accuracy FROM fact_forecast")
-            if not cached_forecast.empty:
-                # Ensure date format consistency with Pandas ML output
-                cached_forecast["forecast_date"] = pd.to_datetime(cached_forecast["forecast_date"]).dt.date
-                cached_forecast["model_run_date"] = pd.to_datetime(cached_forecast["model_run_date"]).dt.date
-                print(f"Loaded {len(cached_forecast)} cached forecast rows.")
-                return cached_forecast
-            else:
-                print("Forecast cache is empty. Falling back to full ML generation...")
+        # ── Daily Schedule ──
+        # Previously gated to Sundays only, out of concern that the full
+        # Prophet run took ~21 hours. That figure turned out to be a local
+        # machine going to sleep mid-run, not real compute time — clean,
+        # uninterrupted runs (see logs/pipeline.log, e.g. 2026-07-14/16/17/20/21)
+        # consistently complete the full engine in 140-650s. Runs daily now
+        # so forecasts, procurement, alerts, and the dashboard cache all stay
+        # fresh instead of being up to 6 days stale. Re-add a day-of-week
+        # gate here (and in .github/workflows/daily_supplynote_sync.yml) if
+        # combo volume grows enough that daily runtime becomes a real problem.
 
         # Find the maximum date in the dataset to simulate "today"
         max_date_df = query_df("""

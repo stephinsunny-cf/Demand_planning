@@ -1,0 +1,32 @@
+name: CI
+
+# Smoke test: verifies the backend installs cleanly and boots on a bare
+# runner (mirrors what Render does on deploy). Catches missing
+# dependencies / broken imports before they ever reach production.
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  backend-build-check:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Verify backend app imports and boots
+        run: |
+          python -c "from backend.main import app; print('backend.main imported OK:', app.title)"
