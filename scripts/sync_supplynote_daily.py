@@ -34,7 +34,7 @@ SN_USERNAME  = os.getenv("SUPPLYNOTE_USER")
 SN_PASSWORD  = os.getenv("SUPPLYNOTE_PASSWORD")
 BUSINESS_ID  = "65b205675255c93a41dd7849"
 
-PG_HOST = os.getenv("PG_HOST", "***REDACTED-DB-HOST***")
+PG_HOST = os.getenv("PG_HOST", "localhost")
 PG_USER = os.getenv("PG_USER", "new_user")
 PG_PASS = os.getenv("PG_PASS")
 PG_DB   = os.getenv("PG_DB",   "demand_planning")

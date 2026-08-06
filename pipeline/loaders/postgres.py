@@ -30,9 +30,9 @@ IST = timezone(timedelta(hours=5, minutes=30))
 def get_local_client():
     """Return a PostgreSQL connection (same DB the backend uses)."""
     return psycopg2.connect(
-        host=os.getenv("PG_HOST", "***REDACTED-DB-HOST***"),
+        host=os.getenv("PG_HOST", "localhost"),
         user=os.getenv("PG_USER", "new_user"),
-        password=os.getenv("PG_PASS", "***REDACTED-DB-PASSWORD***"),
+        password=os.getenv("PG_PASS", ""),
         dbname=os.getenv("PG_DB", "demand_planning"),
         port=int(os.getenv("PG_PORT", "5432")),
         connect_timeout=15,

@@ -20,7 +20,7 @@ An internal demand planning platform for Curefoods — automating demand forecas
 ```powershell
 docker run -d --name clickhouse-local -p 8123:8123 -p 9000:9000 `
   -v clickhouse-data:/var/lib/clickhouse `
-  -e CLICKHOUSE_PASSWORD=admin123 `
+  -e CLICKHOUSE_PASSWORD=<your_local_docker_password> `
   -e CLICKHOUSE_USER=default `
   clickhouse/clickhouse-server
 ```

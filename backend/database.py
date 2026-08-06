@@ -18,9 +18,9 @@ from dotenv import load_dotenv
 load_dotenv()
 log = logging.getLogger(__name__)
 
-PG_HOST = os.getenv("PG_HOST", "***REDACTED-DB-HOST***")
+PG_HOST = os.getenv("PG_HOST", "localhost")
 PG_USER = os.getenv("PG_USER", "new_user")
-PG_PASS = os.getenv("PG_PASS", "***REDACTED-DB-PASSWORD***")
+PG_PASS = os.getenv("PG_PASS", "")
 PG_DB   = os.getenv("PG_DB",   "demand_planning")
 PG_PORT = int(os.getenv("PG_PORT", "5432"))
 

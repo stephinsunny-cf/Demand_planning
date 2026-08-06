@@ -15,7 +15,7 @@ cd "$PROJECT_DIR" || exit 1
 
 # 3. Export environment variables if they aren't in a .env file (Optional)
 # export SUPPLYNOTE_USER="your_user"
-# export PG_HOST="***REDACTED-DB-HOST***"
+# export PG_HOST="localhost"
 # etc...
 
 echo "[$(date)] Starting Daily SupplyNote Sync..."

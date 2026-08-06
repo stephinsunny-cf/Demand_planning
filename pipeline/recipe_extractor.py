@@ -21,9 +21,9 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
-PG_HOST = "***REDACTED-DB-HOST***"
+PG_HOST = "localhost"
 PG_USER = "new_user"
-PG_PASS = "***REDACTED-DB-PASSWORD***"
+PG_PASS = ""
 PG_DB   = "demand_planning"
 PG_PORT = 5432
 

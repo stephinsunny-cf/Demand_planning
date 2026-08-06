@@ -42,9 +42,9 @@ def run():
         
         # Schema setup (quick connection)
         conn = psycopg2.connect(
-            host=os.getenv("PG_HOST", "***REDACTED-DB-HOST***"),
+            host=os.getenv("PG_HOST", "localhost"),
             user=os.getenv("PG_USER", "new_user"),
-            password=os.getenv("PG_PASS", "***REDACTED-DB-PASSWORD***"),
+            password=os.getenv("PG_PASS", ""),
             dbname=os.getenv("PG_DB", "demand_planning"),
             port=os.getenv("PG_PORT", "5432"),
             connect_timeout=10
@@ -185,9 +185,9 @@ def run():
 
                 # Open DB connection exactly when needed to prevent idle timeout
                 conn = psycopg2.connect(
-                    host=os.getenv("PG_HOST", "***REDACTED-DB-HOST***"),
+                    host=os.getenv("PG_HOST", "localhost"),
                     user=os.getenv("PG_USER", "new_user"),
-                    password=os.getenv("PG_PASS", "***REDACTED-DB-PASSWORD***"),
+                    password=os.getenv("PG_PASS", ""),
                     dbname=os.getenv("PG_DB", "demand_planning"),
                     port=os.getenv("PG_PORT", "5432"),
                     connect_timeout=30,
