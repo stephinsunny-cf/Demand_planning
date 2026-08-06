@@ -80,16 +80,22 @@ export function useAuth() {
   }, [])
 
   const signOut = useCallback(async () => {
-    if (process.env.NEXT_PUBLIC_DEMO_MODE === 'true') {
-      setUser(null)
-      localStorage.removeItem('sb-token')
-      document.cookie = 'sb-token=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT'
-      return
-    }
-    await supabase.auth.signOut()
+    // Clear local state and redirect immediately — don't make the user wait
+    // on the Supabase network call, which can be slow. The actual
+    // supabase.auth.signOut() call still happens, just in the background,
+    // since the user is already gone from every protected page by then
+    // (localStorage token cleared -> every subsequent request 401s anyway).
     setUser(null)
     localStorage.removeItem('sb-token')
     document.cookie = 'sb-token=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT'
+    window.location.href = '/login'
+
+    if (process.env.NEXT_PUBLIC_DEMO_MODE !== 'true') {
+      supabase.auth.signOut().catch(() => {
+        // Ignore — the user is already signed out locally and redirected;
+        // a failed background Supabase call doesn't need to block or retry.
+      })
+    }
   }, [])
 
   return { user, loading, signInWithGoogle, signInWithEmail, signOut }
