@@ -9,6 +9,7 @@ import time
 import logging
 from typing import Optional
 
+import jwt as _pyjwt
 from fastapi import Depends, HTTPException, status, Request
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 
@@ -24,6 +25,29 @@ security = HTTPBearer(auto_error=False)
 # Format: {user_id_or_email: (profile_dict, timestamp)}
 _PROFILE_CACHE: dict[str, tuple[dict, float]] = {}
 CACHE_TTL_SECONDS = 30.0
+
+# In-memory cache for Supabase token verification results — this is the
+# expensive network round-trip (sb.auth.get_user), so we avoid repeating it
+# on every request. Deliberately separate from _PROFILE_CACHE above: this
+# only answers "is this token a real, currently-issued Supabase login,"
+# never "is this person still allowed in" — that check (is_active) still
+# runs fresh on every single request below, unaffected by this cache, so
+# admin deactivation still cuts a user off on their very next request.
+# Format: {token: ({"user_id":..., "email":...}, expires_at_epoch)}
+_TOKEN_CACHE: dict[str, tuple[dict, float]] = {}
+TOKEN_CACHE_MAX_TTL_SECONDS = 3600.0  # 1 hour ceiling, matches Supabase's default JWT lifetime
+
+
+def _token_expiry(token: str) -> float | None:
+    """Best-effort read of the JWT's own `exp` claim, no signature check
+    needed — Supabase already verified the token's authenticity for us via
+    the one real get_user() call; this just tells us how long *that*
+    verification should be trusted for before asking again."""
+    try:
+        payload = _pyjwt.decode(token, options={"verify_signature": False, "verify_exp": False})
+        return payload.get("exp")
+    except Exception:
+        return None
 
 
 def clear_user_profile_cache(user_id_or_email: str | None = None):
@@ -100,23 +124,39 @@ async def get_current_user(
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Missing or invalid authentication token")
 
     token = credentials.credentials
+    now = time.time()
 
     try:
-        from supabase import create_client
-        sb = create_client(SUPABASE_URL, SUPABASE_KEY)
-        user_resp = sb.auth.get_user(token)
-        user = user_resp.user
-        if not user:
-            raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid token")
+        cached = _TOKEN_CACHE.get(token)
+        if cached and now < cached[1]:
+            user_id, email = cached[0]["user_id"], cached[0]["email"]
+        else:
+            from supabase import create_client
+            sb = create_client(SUPABASE_URL, SUPABASE_KEY)
+            user_resp = sb.auth.get_user(token)
+            user = user_resp.user
+            if not user:
+                raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid token")
 
-        profile = _fetch_user_profile_from_db(user.id, user.email or "")
+            user_id, email = user.id, user.email or ""
+
+            token_exp = _token_expiry(token)
+            ttl = TOKEN_CACHE_MAX_TTL_SECONDS
+            if token_exp:
+                ttl = min(ttl, max(token_exp - now, 0))
+            _TOKEN_CACHE[token] = ({"user_id": user_id, "email": email}, now + ttl)
+
+        # Always fetched fresh (own 30s cache, cleared instantly on admin
+        # deactivation) — deactivation still cuts a user off on their very
+        # next request regardless of the token cache above.
+        profile = _fetch_user_profile_from_db(user_id, email)
 
         if not profile.get("is_active", True):
             raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="User account is deactivated")
 
         return UserContext(
-            user_id=user.id,
-            email=user.email or profile["email"],
+            user_id=user_id,
+            email=email or profile["email"],
             role=profile.get("role", "viewer"),
             must_reset_password=profile.get("must_reset_password", False),
             is_active=profile.get("is_active", True),
