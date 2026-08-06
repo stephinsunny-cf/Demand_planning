@@ -63,10 +63,18 @@ def run_variance_engine():
         
         upsert_sql = """
             WITH expected AS (
-                SELECT 
+                -- recipe_master.ingredient stores SKU CODES (e.g. "CFIDG177"),
+                -- but fact_daily_sales.sku (used below in `actual`) stores the
+                -- display NAME (e.g. "Egg White Raw"). Joining expected<->actual
+                -- directly on that mismatched identity silently produced two
+                -- disjoint rows per ingredient instead of one reconciled row —
+                -- normalize the code to its name here (via dim_sku, then
+                -- dim_ingredients for semi-finished items dim_sku doesn't have)
+                -- so both sides of the later join speak the same identity.
+                SELECT
                     CAST(o.created_at_ist AS DATE) as date,
                     lower(trim(o.store_name)) as outlet,
-                    lower(trim(rm.ingredient)) as ingredient,
+                    lower(trim(COALESCE(ds.sku_name, di.name, rm.ingredient))) as ingredient,
                     MAX(rm.unit) as unit,
                     SUM(CAST(i.quantity AS NUMERIC) * CAST(am.multiplier AS NUMERIC) * CAST(rm.qty_per_unit AS NUMERIC) + CAST(am.additive_offset AS NUMERIC)) as expected_qty
                 FROM pos_order_items i
@@ -74,9 +82,11 @@ def run_variance_engine():
                 JOIN item_alias_mapping am ON am.pos_name = i.item_name
                     AND (am.pos_option = i.option_names OR am.pos_option IS NULL)
                 JOIN recipe_master rm ON rm.dish_name = am.recipe_name
+                LEFT JOIN dim_sku ds ON lower(ds.sku_code) = lower(rm.ingredient)
+                LEFT JOIN dim_ingredients di ON lower(di.sku) = lower(rm.ingredient)
                 WHERE CAST(o.created_at_ist AS DATE) >= :start_date
                   AND CAST(o.created_at_ist AS DATE) <= :end_date
-                GROUP BY CAST(o.created_at_ist AS DATE), lower(trim(o.store_name)), lower(trim(rm.ingredient))
+                GROUP BY CAST(o.created_at_ist AS DATE), lower(trim(o.store_name)), lower(trim(COALESCE(ds.sku_name, di.name, rm.ingredient)))
             ),
             actual AS (
                 SELECT 

@@ -181,21 +181,33 @@ def run() -> list:
         except Exception as e:
             print(f"Rule 5 error: {e}")
 
-        # RULE 6: Menu item has no recipe
+        # RULE 6: Sold dish has no recipe mapping
+        # item_alias_mapping.pos_name is what actually links a sold POS item
+        # to its recipe (via recipe_master.dish_name) — the previous version
+        # of this rule compared fact_forecast.sku (an INGREDIENT identifier)
+        # against recipe_master.dish_name (a DISH name), two different kinds
+        # of value that were never going to match. Any dish sold without a
+        # pos_name entry here contributes zero expected quantity for every
+        # one of its ingredients in the variance engine — this is the actual
+        # gap that matters, and the dominant cause of "unmapped" variance
+        # rows found 2026-08-06.
         try:
-            # We don't have dim_menu_items in PG, let's use fact_forecast distinct SKUs
-            active_skus = query_df("SELECT DISTINCT sku FROM fact_forecast")
-            recipe_dishes = query_df("SELECT DISTINCT lower(trim(dish_name)) AS dish FROM recipe_master")
-            if not active_skus.empty and not recipe_dishes.empty:
-                active_skus["sku_lower"] = active_skus["sku"].str.lower().str.strip()
-                recipe_set = set(recipe_dishes["dish"].tolist())
-                no_recipe = active_skus[~active_skus["sku_lower"].isin(recipe_set)]
+            recent_dishes = query_df(f"""
+                SELECT DISTINCT i.item_name
+                FROM pos_order_items i
+                JOIN pos_orders o ON i.order_id = o.id
+                WHERE CAST(o.created_at_ist AS DATE) >= '{today - timedelta(days=7)}'
+            """)
+            mapped_dishes = query_df("SELECT DISTINCT pos_name FROM item_alias_mapping")
+            if not recent_dishes.empty:
+                mapped_set = set(mapped_dishes["pos_name"].tolist()) if not mapped_dishes.empty else set()
+                no_recipe = recent_dishes[~recent_dishes["item_name"].isin(mapped_set)]
                 for _, r in no_recipe.iterrows():
-                    if is_new("NO_RECIPE", sku=r["sku"]):
+                    if is_new("NO_RECIPE", sku=r["item_name"]):
                         new_alerts.append(_build_alert(
                             "NO_RECIPE", "WARNING",
-                            f"WARNING: Forecasted dish '{r['sku']}' has no recipe mapped — cannot plan ingredients.",
-                            sku=r["sku"],
+                            f"WARNING: '{r['item_name']}' was sold but has no recipe mapping — its ingredients can't be forecast or variance-checked.",
+                            sku=r["item_name"],
                         ))
         except Exception as e:
             print(f"Rule 6 error: {e}")

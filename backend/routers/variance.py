@@ -18,7 +18,25 @@ async def get_variance(
 ):
     # Fetch variance settings, mapped ingredients, and fact variance concurrently
     task_settings = asyncio.to_thread(query_df, "SELECT * FROM variance_settings")
-    task_mapped = asyncio.to_thread(query_df, "SELECT DISTINCT lower(ingredient) as ingredient FROM recipe_master")
+    # recipe_master.ingredient stores SKU codes (e.g. "CFIDG177"), but
+    # fact_variance.ingredient is a mix of codes AND display names (e.g.
+    # "Aloo Tikki") depending on the source row. Build the mapped set as
+    # both forms — the raw code, plus the matching display name via
+    # dim_sku or dim_ingredients (whichever catalog knows that item —
+    # dim_ingredients in particular covers semi-finished/prepped items
+    # dim_sku doesn't have) — so a name-only row still correctly matches
+    # a code-only recipe regardless of which catalog knows its name.
+    task_mapped = asyncio.to_thread(query_df, """
+        SELECT DISTINCT lower(ingredient) as ingredient FROM recipe_master
+        UNION
+        SELECT DISTINCT lower(d.sku_name) as ingredient
+        FROM dim_sku d
+        WHERE lower(d.sku_code) IN (SELECT DISTINCT lower(ingredient) FROM recipe_master)
+        UNION
+        SELECT DISTINCT lower(di.name) as ingredient
+        FROM dim_ingredients di
+        WHERE lower(di.sku) IN (SELECT DISTINCT lower(ingredient) FROM recipe_master)
+    """)
 
     where = []
     params = []
