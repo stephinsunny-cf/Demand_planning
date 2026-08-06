@@ -32,7 +32,6 @@ export default function AdminPage() {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [newEmail, setNewEmail] = useState('');
   const [newRole, setNewRole] = useState('editor');
-  const [submitting, setSubmitting] = useState(false);
 
   // Custom Confirm/Prompt Modal States
   const [roleDropdownOpen, setRoleDropdownOpen] = useState(false);
@@ -106,30 +105,37 @@ export default function AdminPage() {
 
 
 
-  const handleCreateUser = async (e: React.FormEvent) => {
+  const handleCreateUser = (e: React.FormEvent) => {
     e.preventDefault();
-    setSubmitting(true);
-    setBannerSuccess('');
+    const email = newEmail;
+    const role = newRole;
+
+    // Close the modal and reset the form immediately — don't make the user
+    // wait on Supabase's invite_user_by_email call, which sends a real
+    // email and can be slow. The actual request runs in the background;
+    // the banner updates once it truly resolves, and the row appears in
+    // the list on the next successful refresh.
+    setIsModalOpen(false);
+    setNewEmail('');
+    setNewRole('editor');
     setBannerError('');
     setCriticalOrphanAlert('');
+    setBannerSuccess(`Sending invite to ${email}...`);
 
-    try {
-      const res = await api.post('/api/admin/users', { email: newEmail, role: newRole });
-      setBannerSuccess(`${newEmail} has been added`);
-      setIsModalOpen(false);
-      setNewEmail('');
-      setNewRole('editor');
-      mutate(true);
-    } catch (err: any) {
-      const detail = err.response?.data?.detail || err.message;
-      if (detail && detail.includes('ORPHANED SUPABASE USER')) {
-        setCriticalOrphanAlert(detail);
-      } else {
-        setBannerError(detail || 'Failed to create user');
-      }
-    } finally {
-      setSubmitting(false);
-    }
+    api.post('/api/admin/users', { email, role })
+      .then(() => {
+        setBannerSuccess(`${email} has been added`);
+        mutate(true);
+      })
+      .catch((err: any) => {
+        const detail = err.response?.data?.detail || err.message;
+        setBannerSuccess('');
+        if (detail && detail.includes('ORPHANED SUPABASE USER')) {
+          setCriticalOrphanAlert(detail);
+        } else {
+          setBannerError(detail || 'Failed to create user');
+        }
+      });
   };
 
   const handleResendInvite = async (userId: string, email: string) => {
@@ -541,10 +547,9 @@ export default function AdminPage() {
                 </button>
                 <button
                   type="submit"
-                  disabled={submitting}
                   className="px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg text-sm font-medium disabled:opacity-50"
                 >
-                  {submitting ? 'Creating...' : 'Create & Send Password'}
+                  Create & Send Password
                 </button>
               </div>
             </form>
