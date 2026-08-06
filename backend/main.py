@@ -46,18 +46,36 @@ logging.basicConfig(
 )
 log = logging.getLogger("backend.main")
 
+# Interactive API docs (/docs, /redoc, /openapi.json) expose the entire API
+# surface -- every endpoint, parameter, and response shape -- to anyone who
+# finds the URL, with no auth required to view them. Off by default;
+# set ENABLE_API_DOCS=true (Render env var, or locally in .env) when someone
+# genuinely needs to browse them -- e.g. onboarding a new developer, or
+# debugging integration issues. Turn it back off afterward. Locally without
+# this var set, docs are still reachable at localhost, which nobody outside
+# your machine can hit anyway, so there's no need to set it for normal dev.
+_docs_enabled = os.getenv("ENABLE_API_DOCS", "false").lower() == "true"
+
 app = FastAPI(
     title="Curefoods Demand Planning Engine",
     description="Internal demand forecasting and supply planning platform for Curefoods.",
     version="1.0.0",
-    docs_url="/docs",
-    redoc_url="/redoc",
+    docs_url="/docs" if _docs_enabled else None,
+    redoc_url="/redoc" if _docs_enabled else None,
+    openapi_url="/openapi.json" if _docs_enabled else None,
 )
 
-# ── CORS — allow Next.js dev server ──────────────────────────────────────────
+# ── CORS ──────────────────────────────────────────────────────────────────────
+# Only the real frontend origins get to call this API from a browser.
+# Add a comma-separated ALLOWED_ORIGINS env var (Render/​.env) if another
+# origin genuinely needs access (e.g. a Vercel preview deployment URL) --
+# don't widen this back to "*" as a shortcut.
+_default_origins = "https://cfi-demand-planning.vercel.app,http://localhost:3000"
+_allowed_origins = [o.strip() for o in os.getenv("ALLOWED_ORIGINS", _default_origins).split(",") if o.strip()]
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=_allowed_origins,
     allow_credentials=False,
     allow_methods=["*"],
     allow_headers=["*"],
