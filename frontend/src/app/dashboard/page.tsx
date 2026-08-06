@@ -72,15 +72,6 @@ export default function DashboardPage() {
       ) : (
         <div className="space-y-6">
 
-          {/* Data as of Timestamp */}
-          {data?.last_data_refresh && (
-            <div className="flex items-center justify-end mb-2">
-              <span className="text-xs font-medium text-slate-400 bg-slate-100 dark:bg-slate-800 px-3 py-1 rounded-full border border-slate-200 dark:border-slate-700">
-                Data as of: {formatDistanceToNow(new Date(data.last_data_refresh), { addSuffix: true })}
-              </span>
-            </div>
-          )}
-
           {/* KPI Cards */}
           <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-5 gap-4">
             <KPICard
