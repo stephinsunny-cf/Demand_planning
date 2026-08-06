@@ -30,11 +30,14 @@ export default function LoginPage() {
     setIsSubmitting(true)
     try {
       await signInWithEmail(email, password)
-      
-      // Delay slightly to ensure cookie is propagated
-      await new Promise(r => setTimeout(r, 500))
-      
-      // Check if user must reset password on first login
+      // signInWithEmail already sets the token in localStorage/cookie
+      // synchronously before returning, so there's no propagation delay to
+      // wait out here (the old 500ms sleep was pure dead weight — removed).
+      // The must_reset_password check itself stays: a user who hasn't set
+      // their own password yet must never see the dashboard, not even
+      // briefly, so we resolve this *before* navigating anywhere rather
+      // than relying on Layout.tsx's later check to redirect them away
+      // after the fact.
       try {
         const res = await api.get('/api/auth/profile')
         if (res.data?.must_reset_password) {
@@ -44,7 +47,6 @@ export default function LoginPage() {
       } catch (profileErr) {
         console.warn('Could not fetch profile for reset check', profileErr)
       }
-      
       router.push('/dashboard')
     } catch (err: any) {
       let msg = err.message || 'Failed to sign in'
