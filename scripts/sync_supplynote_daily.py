@@ -14,14 +14,17 @@ Usage:
 import os
 import io
 import sys
-import time
 import logging
 import requests
 import pandas as pd
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from dotenv import load_dotenv
-from playwright.sync_api import sync_playwright, TimeoutError as PWTimeout
 from psycopg2.extras import execute_values
+
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from _supplynote_playwright import SupplyNoteSession
+
+IST = timezone(timedelta(hours=5, minutes=30))
 
 # ── Logging ───────────────────────────────────────────────────────────────────
 logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s")
@@ -29,10 +32,6 @@ log = logging.getLogger("supplynote_sync")
 
 # ── Config ────────────────────────────────────────────────────────────────────
 load_dotenv()  # loads .env locally; on GitHub Actions env vars are injected directly
-
-SN_USERNAME  = os.getenv("SUPPLYNOTE_USER")
-SN_PASSWORD  = os.getenv("SUPPLYNOTE_PASSWORD")
-BUSINESS_ID  = "65b205675255c93a41dd7849"
 
 PG_HOST = os.getenv("PG_HOST", "localhost")
 PG_USER = os.getenv("PG_USER", "new_user")
@@ -327,7 +326,7 @@ def upsert_stock_to_db(stock_list):
         tracked_skus = {row[0] for row in cursor.fetchall()}
         filtered_stock_list = [s for s in stock_list if s['sku'] in tracked_skus]
         
-        today = datetime.now().strftime("%Y-%m-%d")
+        today = datetime.now(timezone.utc).astimezone(IST).strftime("%Y-%m-%d")
         fact_data = [
             (today, s['outlet'], s['sku'], s['qty_available'], s['unit'],
              s.get('outlet_code', None))
@@ -378,93 +377,46 @@ def run():
     args = parser.parse_args()
 
     if args.date:
-        target = datetime.strptime(args.date, "%Y-%m-%d")
+        target = datetime.strptime(args.date, "%Y-%m-%d").date()
     else:
-        target = datetime.now() - timedelta(days=1)
-        target = target.replace(hour=0, minute=0, second=0, microsecond=0)
+        # "Yesterday" must be computed in IST (the business's own calendar),
+        # not raw UTC wall-clock time. GitHub Actions' scheduled runs are not
+        # guaranteed to fire on time -- this run has been observed starting
+        # 4+ hours late. A UTC-based `datetime.now() - 1 day` computed after
+        # that slip silently rolls over to the *next* IST day, so the script
+        # ends up fetching and writing today's data under today's date while
+        # leaving yesterday empty. Anchoring to IST avoids that entirely.
+        now_ist = datetime.now(timezone.utc).astimezone(IST)
+        target = (now_ist - timedelta(days=1)).date()
 
     log.info(f"Syncing data for: {target.strftime('%Y-%m-%d')}")
 
-    plan_date_utc = target.strftime("%Y-%m-%dT18:30:00.000Z")
+    try:
+        with SupplyNoteSession() as session:
+            log.info("Logged in successfully!")
 
-    with sync_playwright() as p:
-        browser = p.chromium.launch(
-            headless=True,
-            args=["--no-sandbox", "--disable-dev-shm-usage"]
-        )
-        context = browser.new_context(
-            accept_downloads=False,
-            viewport={"width": 1440, "height": 900},
-            user_agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/124.0.0.0 Safari/537.36"
-        )
-        page = context.new_page()
-
-        try:
-            # ── Login ────────────────────────────────────────────────────────
-            log.info("Navigating to SupplyNote signin...")
-            page.goto("https://www.supplynote.in/signin", wait_until="domcontentloaded", timeout=60000)
-            page.fill('input[name="username"], input[name="email"], input[placeholder*="username" i], input[placeholder*="email" i]', SN_USERNAME)
-            page.fill('input[type="password"]', SN_PASSWORD)
-            page.click('button:has-text("Log in")')
-            try:
-                page.wait_for_url(lambda url: "/signin" not in url and "/login" not in url, timeout=25000)
-                log.info("Logged in successfully!")
-            except PWTimeout:
-                log.error("Login failed. Check SUPPLYNOTE_USER / SUPPLYNOTE_PASSWORD secrets.")
-                sys.exit(1)
-
-            # ── 1.5. Download Current Stock ─────────────────────────────────────
-            stock_list = sync_stock_via_playwright(page)
+            # ── 1.5. Download Current Stock ─────────────────────────────────
+            stock_list = sync_stock_via_playwright(session.page)
             if stock_list:
                 upsert_stock_to_db(stock_list)
 
-            # ── Get version key ───────────────────────────────────────────────
-            versions = page.evaluate(f"""async () => {{
-                try {{
-                    const r = await fetch('/api/demandplan/history/semiFinished?business={BUSINESS_ID}&planDate={plan_date_utc}',
-                        {{ headers: {{ 'Accept': 'application/json' }} }});
-                    const b = await r.json();
-                    return b.data || [];
-                }} catch(e) {{ return []; }}
-            }}""")
-
-            if not versions:
+            # ── Get version key (IST-aware date math, see _supplynote_playwright.py) ──
+            version_key = session.get_version_key(target)
+            if not version_key:
                 log.warning(f"No versions found for {target.strftime('%Y-%m-%d')}. Nothing to sync.")
                 sys.exit(0)
-
-            version_key = versions[0].get("versionKey")
             log.info(f"Version key: {version_key}")
 
             # ── Get S3 URL ────────────────────────────────────────────────────
-            s3_url = None
-            for attempt in range(5):
-                log.info(f"Fetching S3 URL (attempt {attempt+1}/5)...")
-                s3_url = page.evaluate(f"""async () => {{
-                    try {{
-                        const r = await fetch('/api/demandplan/download/semiFinished-combined?type=all&versionKey={version_key}',
-                            {{ headers: {{ 'Accept': 'application/json' }} }});
-                        if (r.status === 504) return '504';
-                        if (!r.ok) return 'error';
-                        const b = await r.json();
-                        return b.data || null;
-                    }} catch(e) {{ return 'error'; }}
-                }}""")
-
-                if s3_url and s3_url not in ("504", "error"):
-                    log.info(f"Got S3 URL: {s3_url[:60]}...")
-                    break
-                log.warning(f"  Attempt {attempt+1} failed ({s3_url}). Waiting 30s...")
-                time.sleep(30)
-
-            if not s3_url or s3_url in ("504", "error"):
+            s3_url = session.get_s3_url(version_key)
+            if not s3_url:
                 log.error("Could not get S3 URL after 5 attempts.")
                 sys.exit(1)
+            log.info(f"Got S3 URL: {s3_url[:60]}...")
 
-        except Exception as e:
-            log.error(f"Playwright error: {e}")
-            sys.exit(1)
-        finally:
-            browser.close()
+    except RuntimeError as e:
+        log.error(str(e))
+        sys.exit(1)
 
     # ── Download CSV into memory (no file saved!) ─────────────────────────────
     log.info("Downloading CSV directly into memory...")
