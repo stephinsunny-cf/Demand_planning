@@ -12,9 +12,10 @@
 **Decision:** Use a headless browser (Playwright) to scrape SupplyNote.
 **Why:** SupplyNote does not offer a developer-facing REST API for historical kitchen consumption. Scraping CSVs via the UI was the only automated pathway.
 
-## 4. Backend Deployment: Manual on Render
-**Decision:** Render auto-deploy is disabled.
-**Why:** To prevent unverified code or broken pipeline scripts from immediately pushing to production and breaking the active forecasting engine.
+## 4. Backend Deployment: Auto-deploy on `main` only
+**Decision:** Render auto-deploy is enabled, scoped specifically to the `main` branch. (Previously disabled entirely, for the same reason below — revisited once the `development` → verify → merge-to-`main` workflow was established as the actual working pattern.)
+**Why:** Code only reaches `main` after being pushed to `development` first and verified there, so by the time it lands on `main` it's already been checked — auto-deploying from `main` doesn't skip that verification step. If auto-deploy were scoped to `development` too, unverified in-progress code would go live immediately, which is exactly what the original decision was trying to prevent.
+**Testing `development` before merging:** No separate staging service — changes are run and verified locally (`uvicorn backend.main:app --reload`, or pipeline scripts directly) against the real database before merging to `main`. Considered a second Render service auto-deploying from `development` for a live preview environment, but decided against it for now: extra infrastructure to maintain, and it would need its own database (or risk unverified code writing bad data to the shared production DB) to be safe. Revisit if local-only testing stops being sufficient.
 
 ## 5. Aggregation Strategy: Application-level vs DB-level
 **Decision:** Heavy aggregations (grouping by SKU/Outlet) are done in PostgreSQL (`GROUP BY`), passing only small aggregated result sets (thousands of rows) to Pandas/FastAPI.
