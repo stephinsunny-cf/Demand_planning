@@ -77,9 +77,8 @@ jobs:
           PG_DB:               ${{ secrets.PG_DB }}
           PG_PORT:             ${{ secrets.PG_PORT }}
         run: |
-          # Runs every day. Previously gated to Sundays only over a ~21h
-          # runtime scare that turned out to be a local machine sleeping
-          # mid-run, not real compute time — clean CI runs finish in a few
-          # minutes. If combo volume grows enough to matter, re-add a
-          # day-of-week gate here and in pipeline/engines/forecast_engine.py.
+          # Runs every day. Forecast step now uses lightgbm_engine.py, which
+          # runs a single global model (~7-19 min end to end) instead of
+          # Prophet's one-model-per-combo approach, so there's no need for
+          # the old Sunday-only gate this comment used to describe.
           python pipeline/main.py --process-only

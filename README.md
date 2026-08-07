@@ -41,14 +41,6 @@ python -m venv venv
 pip install -r requirements.txt
 ```
 
-> **Note on Prophet on Windows**: If Prophet install fails, run:
-> ```powershell
-> pip install pystan==3.9.0
-> pip install prophet
-> ```
-> If it still fails, install Microsoft C++ Build Tools from:
-> https://visualstudio.microsoft.com/visual-cpp-build-tools/
-
 ### 3. Configure Environment
 
 ```powershell
@@ -181,10 +173,6 @@ docker start clickhouse-local  # Start if stopped
 **UrbanPiper connection blocked (office WiFi)**
 - Switch to mobile hotspot
 - Connection will auto-detect and suggest this
-
-**Prophet install fails on Windows**
-- Install C++ Build Tools: https://visualstudio.microsoft.com/visual-cpp-build-tools/
-- Or use `conda install -c conda-forge prophet`
 
 **SupplyNote token expired**
 - The extractor auto-refreshes using `SUPPLYNOTE_EMAIL` and `SUPPLYNOTE_PASSWORD`

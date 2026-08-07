@@ -26,8 +26,7 @@ pydantic-settings>=2.2.0
 supabase>=2.4.0
 
 # Forecasting
-prophet>=1.1.5
-pystan>=3.9.0
+lightgbm>=4.0.0
 
 # Scheduling
 schedule>=1.2.0
