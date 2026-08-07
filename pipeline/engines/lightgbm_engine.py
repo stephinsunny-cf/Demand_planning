@@ -151,11 +151,40 @@ def _train_model(train_df: pd.DataFrame, combos: pd.DataFrame, hist_start: date,
 
 def _predict(model, combo_means: pd.DataFrame, history_df: pd.DataFrame, combos: pd.DataFrame,
              hist_start: date, pred_start: date, pred_end: date, holiday_dates: set) -> pd.DataFrame:
-    panel = _build_dense_panel(history_df, combos, hist_start, pred_end)
-    panel = _add_features(panel, combo_means, holiday_dates)
-    pred_rows = panel[(panel["date"] >= pred_start) & (panel["date"] <= pred_end)].copy()
-    pred_rows["qty_predicted"] = model.predict(pred_rows[FEATURE_COLS]).clip(min=0)
-    return pred_rows[["date", "sku", "outlet", "qty_predicted"]]
+    """Predict one day at a time, feeding each day's own prediction back in as
+    that day's "known" value before computing lag/rolling features for the
+    next day.
+
+    Predicting the whole horizon in one shot doesn't work: _build_dense_panel
+    fills every date it doesn't have real data for with qty_sold=0 so the
+    per-combo date grid stays complete, but for future (not-yet-happened)
+    dates that 0 isn't a real observation -- it's a placeholder. lag/rolling
+    features computed straight off that column don't know the difference, so
+    the further into the horizon a day is, the more of its rolling window is
+    fake zeros instead of real sales, and roll_mean_7 collapses toward 0
+    (measured: a combo with a real ~130/day average fell to a "recent
+    average" of 30 by day 7 of a 7-day horizon). The model then predicts off
+    that deflated signal and badly under-forecasts later days. Recursing
+    day-by-day and substituting the prediction for the placeholder avoids
+    that entirely.
+    """
+    extended = history_df
+    all_preds = []
+    current = pred_start
+    while current <= pred_end:
+        panel = _build_dense_panel(extended, combos, hist_start, current)
+        panel = _add_features(panel, combo_means, holiday_dates)
+        day_rows = panel[panel["date"] == current].copy()
+        day_rows["qty_predicted"] = model.predict(day_rows[FEATURE_COLS]).clip(min=0)
+        all_preds.append(day_rows[["date", "sku", "outlet", "qty_predicted"]])
+
+        carry_forward = day_rows[["date", "sku", "outlet", "qty_predicted"]].rename(
+            columns={"qty_predicted": "qty_sold"}
+        )
+        extended = pd.concat([extended, carry_forward], ignore_index=True)
+        current += timedelta(days=1)
+
+    return pd.concat(all_preds, ignore_index=True)
 
 
 def run() -> pd.DataFrame:
@@ -209,8 +238,9 @@ def run() -> pd.DataFrame:
             lambda r: max(0.0, 100.0 * (1 - r["abs_err"] / r["actual"])) if r["actual"] > 0 else None, axis=1
         )
         combo_acc = combo_acc[["sku", "outlet", "in_sample_accuracy"]]
-        log.info(f"Held-out accuracy computed for {len(combo_acc):,} combos "
-                 f"(mean {combo_acc['in_sample_accuracy'].mean():.2f}%)")
+        scorable = combo_acc["in_sample_accuracy"].notna().sum()
+        log.info(f"Held-out accuracy: {scorable:,} of {len(combo_acc):,} combos had actual sales "
+                 f"in the holdout week to score against (mean {combo_acc['in_sample_accuracy'].mean():.2f}%)")
 
         # ── Pass 2: real forecast, trained on everything available ────────
         final_model, final_combo_means = _train_model(full_history, combos, hist_start, max_date, holiday_dates)
@@ -239,11 +269,17 @@ def run() -> pd.DataFrame:
                     VALUES %s
                 """
                 from psycopg2.extras import execute_values
+                # pandas silently turns a missing in_sample_accuracy (combos with
+                # no actual sales in the holdout week to score against) into the
+                # float NaN, not None -- and psycopg2 will happily write that NaN
+                # in as a real stored value instead of SQL NULL, which then
+                # poisons any AVG()/SUM() touching the column. Convert explicitly.
+                acc_col = forecast["in_sample_accuracy"].where(forecast["in_sample_accuracy"].notna(), None)
                 values = [
                     (row["forecast_date"], row["sku"], row["outlet"],
                      float(row["qty_predicted"]), float(row["qty_lower"]), float(row["qty_upper"]),
-                     row["model_run_date"], row.get("in_sample_accuracy", None))
-                    for _, row in forecast.iterrows()
+                     row["model_run_date"], acc)
+                    for (_, row), acc in zip(forecast.iterrows(), acc_col)
                 ]
                 execute_values(cur, insert_query, values)
 
